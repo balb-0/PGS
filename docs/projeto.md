@@ -156,13 +156,13 @@ A validação foi conduzida através de abordagem Test Data Driven (TDD) com 17 
 pip install -r requirements.txt
 
 # Executar todos os testes DN2
-pytest src/tests/test_mock_api.py -v
+pytest src/tests/blue_team/validation.py -v
 
 # Executar apenas testes de integridade
-pytest src/tests/test_mock_api.py::TestDN2IntegrityValidation -v
+pytest src/tests/blue_team/validation.py::TestDN2IntegrityValidation -v
 
 # Executar apenas testes de contrato
-pytest src/tests/test_mock_api.py::TestDN2ContractValidation -v
+pytest src/tests/blue_team/validation.py::TestDN2ContractValidation -v
 ```
 
 ### Impacto na Qualidade
