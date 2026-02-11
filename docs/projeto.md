@@ -28,7 +28,7 @@ incluir Sumário
 
 # 1. Business Drivers
 
-## 1.1 DN1 - Latência de Ingestão
+## 1.1 DN1 (Blue Team) - Latência de Ingestão
 - SLA: 90% dos arquivos de auditoria devem gerar um ID de processo em até 500ms (P90 <= 500ms). 
 - Este direcionador simula o processo em que o sistema Kolossus receba e processe lotes de documentos fiscais dentro dos parâmetros de performance necessários para não impactar a operação dos clientes.
 
@@ -66,7 +66,7 @@ A API foi projetada para seguir a estrutura de referência exigida, mapeando as 
 
 - Comportamento de Alerta: O código monitorou proativamente os limites, não detectando violações de 650 ms durante o ciclo de teste.
 
-## 1.2 DN2 - Integridade dos Dados Fiscais na Ingestão
+## 1.2 DN2 (Blue Team) - Integridade dos Dados Fiscais na Ingestão
 
 ### Objetivo
 Garantir a validação rigorosa de payloads fiscais **antes do processamento**, evitando erros de integridade de dados na ingestão de documentos fiscais. Este direcionador assegura que apenas lotes válidos sejam processados, protegendo a integridade dos dados da ASIS TaxTech.
@@ -172,3 +172,46 @@ Este direcionador contribui para:
 - **Performance:** Validação anterior ao processamento assíncrono economiza recursos
 - **Rastreabilidade:** Garante que apenas lotes válidos recebem tracking_id
 - **Manutenibilidade:** Código testado com 14 cenários de negócio documentados
+
+## 1.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão
+
+### Objetivo do Ativo Adversarial
+&emsp;Esta seção apresenta os resultados da análise de segurança e robustez realizada pelo **Red Team** sobre o Direcionador de Negócio 2 (DN2 - Integridade de Dados). O objetivo é validar se o sistema de auditoria da **ASIS TaxTech** é capaz de resistir a entradas malformadas ou extremas que visam comprometer a integridade dos dados fiscais.
+
+### Mapa de Direcionadores de Negócio - Red Team (DN2)
+&emsp;Foram implementados 5 direcionadores que testam os limites da lógica de validação:
+
+| ID | Direcionador Adversarial | Objetivo Técnico | Status |
+| :--- | :--- | :--- | :--- |
+| **DN2.R1** | **Script Injection** | Validar se o sistema trata payloads maliciosos (`<script>`) como texto comum. | **PASS** |
+| **DN2.R2** | **Extreme Number Resilience** | Testar o comportamento da API com valores não finitos (`inf`, `nan`) ou astronômicos. | **FAIL** |
+| **DN2.R3** | **Schema Pollution** | Verificar se o excesso de campos (5.000+) causa degradação de performance. | **PASS** |
+| **DN2.R4** | **Strict Type Validation** | Tentar enviar estruturas complexas (listas) onde se espera um valor numérico. | **PASS** |
+| **DN2.R5** | **Buffer Stability** | Enviar strings massivas (1MB) para testar limites de memória do endpoint. | **PASS** |
+
+### Métodos de Testagem
+O teste foi conduzido utilizando o framework **pytest-9.0.2** em ambiente **Python 3.13.3**.
+* **Abordagem**: Foi utilizado o `FastAPI TestClient` para simular ataques de injeção de dados e poluição de schema.
+* **Escopo**: Foco exclusivo na validação de entrada (Input Validation) antes da geração do `tracking_id` e do processamento assíncrono.
+
+### Análise dos Resultados (Logs de Execução)
+
+A execução automatizada (`validation_red.py`) coletou 7 itens e identificou vulnerabilidades críticas no tratamento de números:
+
+### **Sucessos de Resiliência**
+* **Injeção de Scripts**: O sistema tratou tags HTML/JS como literais, impedindo ataques de Cross-Site Scripting (XSS).
+* **Poluição de Schema**: A API processou 5.000 campos extras sem violar o SLA de tempo de resposta.
+* **Tipagem**: Tentativas de enviar listas no campo `valor` foram barradas com HTTP 400.
+
+### **Falhas Críticas Identificadas**
+O teste de **Resiliência Numérica** falhou em três cenários específicos:
+1. **ValueError (inf/nan)**: O `json.encoder` padrão do Python não é compatível com valores `inf` e `nan` fora do padrão JSON (RFC 8259). Isso causou a interrupção do cliente de teste.
+2. **Bypass de Regra (1e308)**: O sistema retornou **HTTP 201 Created** para um valor de $1 \times 10^{308}$, que embora positivo, é computacionalmente extremo e fiscalmente impossível. O sistema deveria ter retornado **HTTP 400**.
+
+### Argumentação e Ações Corretivas
+Para que este ativo de software atinja o padrão de excelência, as seguintes ações de engenharia são necessárias:
+* **Validação de Finitude**: Implementar `math.isfinite(valor)` na `mock_api.py` para rejeitar infinitos.
+* **Limites de Sanidade**: Estabelecer um teto máximo para o campo `valor` condizente com a realidade de lotes fiscais da ASIS.
+
+---
+
