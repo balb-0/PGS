@@ -29,7 +29,7 @@ incluir Sumário
 # 1. Business Drivers
 
 ## 1.1 DN1 (Blue Team) - Latência de Ingestão
-- SLA: 90% dos arquivos de auditoria devem gerar um ID de processo em até 500ms (P90 <= 500ms). 
+- SLA: 90% dos arquivos de auditoria devem gerar um ID de processo em até 500ms (P90 <= 500ms).
 - Este direcionador simula o processo em que o sistema Kolossus receba e processe lotes de documentos fiscais dentro dos parâmetros de performance necessários para não impactar a operação dos clientes.
 
 ### Especificação da API_MOCK_G6
@@ -137,7 +137,7 @@ A validação foi conduzida através de abordagem Test Data Driven (TDD) com 17 
 
 - **Taxa de Cobertura:** 100% (17/17 testes passando)
 
-- **Cenários Testados:** 
+- **Cenários Testados:**
   - 7 cenários de rejeição (erro HTTP 400)
   - 7 cenários de aceitação (sucesso HTTP 201)
   - 3 validações de contrato
@@ -215,3 +215,192 @@ Para que este ativo de software atinja o padrão de excelência, as seguintes a�
 
 ---
 
+## 1.4 DN4 (Blue Team) - Não-Repúdio de Transações de Auditoria Fiscal
+
+### Objetivo
+Garantir que todas as transações de auditoria fiscal sejam realizadas com **mecanismos criptográficos de não-repúdio**, impedindo que qualquer das partes negue a realização de uma transação. Este direcionador subsidia as áreas de segurança e suporte aos clientes da ASIS TaxTech, fornecendo evidências criptográficas de **quem** realizou a transação, **o quê** foi transacionado, e **quando** ocorreu.
+
+### Especificação da API — Endpoint de Não-Repúdio
+
+**Endpoint:** `POST /api/v1/auditar/nr`
+
+A API estende o endpoint original (`/api/v1/auditar`) com uma camada completa de não-repúdio. Os mesmos campos de entrada são utilizados:
+
+- `sessao_cliente`: Identificador único da sessão de auditoria.
+- `valor`: Volume de documentos fiscais submetidos no lote.
+- `destino`: Módulo fiscal de destino (ex: `EFD_ICMS_IPI`, `NCM_AUDIT`).
+
+**Headers obrigatórios:** `account-key`, `app-key`
+
+A resposta inclui todos os campos originais (DN2) mais o bloco `non_repudiation`:
+
+```json
+{
+  "id": 25000,
+  "status": 201,
+  "tracking_id": "uuid-v4",
+  "arquivold": 22500,
+  "diagnostico": "Conforme",
+  "detalhes": { "cliente": "...", "volume_processado": 2500, "modulo": "..." },
+  "non_repudiation": {
+    "signature": "hmac-sha256-hex-64-chars",
+    "timestamp": "2026-02-12T12:00:00.000000+00:00",
+    "actor": "sha256-hex-64-chars",
+    "receipt": {
+      "signature": "...",
+      "timestamp": "...",
+      "actor": "...",
+      "tracking_id": "...",
+      "payload_hash": "sha256-hex-64-chars"
+    },
+    "log_position": 0,
+    "log_entry_hash": "sha256-hex-64-chars",
+    "alert": null,
+    "chain_alert": null
+  }
+}
+```
+
+**Endpoints auxiliares de auditoria:**
+- `GET /api/v1/audit-log` — Retorna o log completo com status de integridade da cadeia de hash.
+- `GET /api/v1/audit-log/{position}` — Retorna uma entrada específica do log.
+
+### Mapa de Direcionadores de Negócio — Blue Team (DN4)
+
+&emsp;Foram implementados 6 direcionadores que garantem o não-repúdio completo das transações:
+
+| ID | Direcionador de Negócio | SLA / Critério de Aceite | Status |
+| :--- | :--- | :--- | :--- |
+| **DN4.1** | **Assinatura Digital (HMAC-SHA256)** | 100% das transações válidas retornam assinatura HMAC-SHA256 verificável sobre payload + timestamp. | **PASS** |
+| **DN4.2** | **Carimbo Temporal Imutável** | 100% das transações incluem timestamp ISO 8601 server-side; tolerância ≤ 2s do horário real. | **PASS** |
+| **DN4.3** | **Cadeia de Autenticação** | Toda resposta registra o `actor` (SHA-256 da account-key), vinculando identidade à transação. | **PASS** |
+| **DN4.4** | **Recibo Digital Completo** | Respostas válidas incluem recibo com: `signature`, `timestamp`, `actor`, `tracking_id`, `payload_hash`. | **PASS** |
+| **DN4.5** | **Integridade do Log de Auditoria** | Log com cadeia de hash (hash chain); cada entrada referencia `prev_hash` da anterior. Cadeia verificável. | **PASS** |
+| **DN4.6** | **Alerta de Violação de Não-Repúdio** | Sistema emite `ALERTA` quando campos de não-repúdio estão ausentes ou cadeia de hash comprometida. Limiar de 30% (padrão DN1). | **PASS** |
+
+### Implementação Técnica
+
+**Módulo de não-repúdio (`src/core/non_repudiation.py`):**
+
+```python
+# DN4.1: Assinatura digital HMAC-SHA256
+def sign_transaction(payload, timestamp, secret) -> str:
+    message = json.dumps(payload, sort_keys=True) + "|" + timestamp
+    return hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
+
+# DN4.2: Carimbo temporal imutável (server-side, UTC)
+def generate_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+# DN4.3: Hash do ator autenticado
+def hash_actor(account_key) -> str:
+    return hashlib.sha256(account_key.encode()).hexdigest()
+
+# DN4.4: Recibo digital completo
+def build_receipt(signature, timestamp, actor, tracking_id, payload) -> dict:
+    return {"signature": ..., "timestamp": ..., "actor": ...,
+            "tracking_id": ..., "payload_hash": hash_payload(payload)}
+
+# DN4.5: Log de auditoria com hash chain
+class AuditLog:
+    def append(self, receipt) -> dict:  # Adiciona entrada com prev_hash encadeado
+    def verify_chain(self) -> bool:      # Verifica integridade da cadeia completa
+
+# DN4.6: Alertas de violação
+def check_alert(receipt) -> Optional[str]:       # Campos ausentes no recibo
+def check_chain_alert(log) -> Optional[str]:     # Cadeia de hash comprometida
+```
+
+### Metodologia de Testagem (Blue Team — TDD)
+
+&emsp;A aferição foi conduzida utilizando abordagem Test Data Driven (TDD) através do script `src/tests/blue_team/non_repudiation.py`.
+
+&emsp;**Cada cenário de teste é executado 3 vezes** (iterações parametrizadas via `@pytest.mark.parametrize`) para garantir consistência e reprodutibilidade dos resultados.
+
+&emsp;**Massa de testes não-funcionais:** Os payloads de teste simulam sessões reais de auditoria fiscal com volumes variados (`PAYLOAD_VALIDO`: 2500.00 docs para EFD_ICMS_IPI; `PAYLOAD_ALTERNATIVO`: 7500.50 docs para NCM_AUDIT).
+
+&emsp;**Versão da API testada:** v1.1.0 — `POST /api/v1/auditar/nr`
+
+**Estrutura dos testes (7 classes, 24 cenários × 3 iterações = 72 execuções):**
+
+| Classe de Teste | Cenários | Direcionador |
+| :--- | :--- | :--- |
+| `TestDN4AssinaturaDigital` | 4 testes × 3 iter | DN4.1 |
+| `TestDN4CarimboTemporal` | 3 testes × 3 iter | DN4.2 |
+| `TestDN4CadeiaAutenticacao` | 3 testes × 3 iter | DN4.3 |
+| `TestDN4ReciboDigital` | 4 testes × 3 iter | DN4.4 |
+| `TestDN4LogAuditoria` | 4 testes × 3 iter | DN4.5 |
+| `TestDN4Alertas` | 5 testes × 3 iter | DN4.6 |
+| `TestDN4ContratoAPI` | 3 testes × 3 iter | Contrato |
+| `TestDN4ConsultaLog` | 3 testes × 3 iter | DN4.5 |
+
+### Resultados Obtidos
+
+&emsp;A suíte de testes validou a implementação do DN4 com os seguintes indicadores:
+
+- **Status Final:** APROVADO
+
+- **Taxa de Cobertura:** 100% (29 cenários × 3 iterações = 87 execuções passando)
+
+- **Cenários Testados:**
+  - 12 cenários de assinatura e criptografia (DN4.1)
+  - 9 cenários de carimbo temporal (DN4.2)
+  - 9 cenários de cadeia de autenticação (DN4.3)
+  - 12 cenários de recibo digital (DN4.4)
+  - 12 cenários de integridade do log (DN4.5)
+  - 15 cenários de alertas (DN4.6)
+  - 9 cenários de contrato da API
+  - 9 cenários de consulta do log
+
+- **Verificações de Negócio:**
+  - DN4.1: Assinatura HMAC-SHA256 → 4 testes
+  - DN4.2: Timestamp ISO 8601 ≤ 2s → 3 testes
+  - DN4.3: Actor SHA-256 → 3 testes
+  - DN4.4: Recibo completo → 4 testes
+  - DN4.5: Hash chain íntegra → 4 testes
+  - DN4.6: Alertas de violação → 5 testes
+  - Contrato API preservado → 3 testes
+  - Consulta de log → 3 testes
+
+### Execução dos Testes
+
+```bash
+# Instalar dependências
+pip install -r requirements.txt
+
+# Executar todos os testes DN4 (Blue Team)
+pytest src/tests/blue_team/non_repudiation.py -v
+
+# Executar apenas testes de assinatura digital
+pytest src/tests/blue_team/non_repudiation.py::TestDN4AssinaturaDigital -v
+
+# Executar apenas testes de carimbo temporal
+pytest src/tests/blue_team/non_repudiation.py::TestDN4CarimboTemporal -v
+
+# Executar apenas testes de cadeia de autenticação
+pytest src/tests/blue_team/non_repudiation.py::TestDN4CadeiaAutenticacao -v
+
+# Executar apenas testes de recibo digital
+pytest src/tests/blue_team/non_repudiation.py::TestDN4ReciboDigital -v
+
+# Executar apenas testes de log de auditoria
+pytest src/tests/blue_team/non_repudiation.py::TestDN4LogAuditoria -v
+
+# Executar apenas testes de alertas
+pytest src/tests/blue_team/non_repudiation.py::TestDN4Alertas -v
+
+# Executar apenas testes de contrato
+pytest src/tests/blue_team/non_repudiation.py::TestDN4ContratoAPI -v
+```
+
+### Impacto na Qualidade
+
+Este direcionador contribui para:
+- **Não-Repúdio:** Evidência criptográfica irrefutável de cada transação fiscal processada
+- **Segurança:** Assinatura HMAC-SHA256 impede adulteração de conteúdo pós-processamento
+- **Rastreabilidade:** Cadeia de autenticação vincula cada transação a um ator específico
+- **Auditabilidade:** Log com hash chain permite verificação retroativa de integridade
+- **Suporte ao Cliente:** Recibo digital completo serve como prova de processamento
+- **Monitoramento:** Sistema de alertas detecta proativamente anomalias nos mecanismos de não-repúdio
+
+---
