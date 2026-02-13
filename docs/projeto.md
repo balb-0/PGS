@@ -22,8 +22,8 @@
 - <a href="https://www.linkedin.com/in/username/">Nome</a>
 - <a href="https://www.linkedin.com/in/username/">Nome</a>
 
-
 # Sumário
+
 incluir Sumário
 
 # 1. Business Drivers
@@ -33,6 +33,7 @@ incluir Sumário
 - Este direcionador simula o processo em que o sistema Kolossus receba e processe lotes de documentos fiscais dentro dos parâmetros de performance necessários para não impactar a operação dos clientes.
 
 ### Especificação da API_MOCK_G6
+
 A API foi projetada para seguir a estrutura de referência exigida, mapeando as necessidades da ASIS:
 
 - sessao_cliente: Identificador único da sessão de auditoria.
@@ -42,6 +43,7 @@ A API foi projetada para seguir a estrutura de referência exigida, mapeando as 
 - destino: Módulo fiscal de destino (ex: 'EFD_ICMS_IPI', 'NCM_AUDIT').
 
 ### Métricas de SLA e Alertas
+
 - SLA de Latência: ≤ 500 ms (90% das requisições).
 
 - Alerta de Lentidão Crítica: Disparo automático de sinalização caso o tempo exceda 650 ms (30% acima do SLA).
@@ -49,6 +51,7 @@ A API foi projetada para seguir a estrutura de referência exigida, mapeando as 
 - Status de Efetivação: A transação é considerada válida apenas com o retorno HTTP 201 Created.
 
 ### Metodologia de Testagem (Blue Team)
+
 &emsp;A aferição foi conduzida utilizando uma abordagem Test Data Driven (TDD) através do script src/tests/blue_team/response_time.py.
 
 &emsp;Serviços de Apoio: Implementação de mecanismos de Autenticação (account-key/app-key), Rastreio (geração de ID de processo) e Efetivação (validação de persistência assíncrona).
@@ -56,6 +59,7 @@ A API foi projetada para seguir a estrutura de referência exigida, mapeando as 
 &emsp;Ambiente: Execução via CLI conectada a um servidor Mock que replica o comportamento assíncrono da ASIS API.
 
 ### Resultados Obtidos
+
 &emsp;A suíte de testes validou a resiliência do sistema com os seguintes indicadores:
 
 - Status Final: APROVADO
@@ -69,28 +73,33 @@ A API foi projetada para seguir a estrutura de referência exigida, mapeando as 
 ## 1.2 DN2 (Blue Team) - Integridade dos Dados Fiscais na Ingestão
 
 ### Objetivo
+
 Garantir a validação rigorosa de payloads fiscais **antes do processamento**, evitando erros de integridade de dados na ingestão de documentos fiscais. Este direcionador assegura que apenas lotes válidos sejam processados, protegendo a integridade dos dados da ASIS TaxTech.
 
 ### Regras de Negócio
 
 **DN2.1 - Validação de Campos Obrigatórios**
+
 - A API deve rejeitar requisições com campos obrigatórios ausentes: `sessao_cliente`, `valor`, `destino`
 - Retorna HTTP 400 com mensagem clara
 - Garante rastreabilidade e roteamento correto das auditorias
 
 **DN2.2 - Validação de Valor Positivo**
+
 - A API deve rejeitar requisições onde `valor` ≤ 0
 - Aceita valores inteiros e decimais positivos
 - O tipo deve ser numérico (int ou float)
 - Fundamenta-se na impossibilidade lógica de auditar lotes com volume zero ou negativo
 
 **DN2.3 & DN2.4 - Sem Processamento em Erro**
+
 - A API **NÃO** gera `tracking_id` para payloads inválidos
 - A API **NÃO** inicia processamento assíncrono para payloads inválidos
 - Validação ocorre **ANTES** de qualquer operação assíncrona (`await`)
 - Evita alocação desnecessária de recursos e garante atomicidade
 
 **DN2.5 - Preservação de Contrato**
+
 - Payloads válidos mantêm o comportamento original da API
 - Resposta preserva mesma estrutura: id, status, tracking_id, detalhes, etc.
 - Headers obrigatórios (account-key, app-key) continuam sendo validados
@@ -100,6 +109,7 @@ Garantir a validação rigorosa de payloads fiscais **antes do processamento**, 
 **Endpoint afetado:** `POST /api/v1/auditar`
 
 **Validações implementadas em src/core/mock_api.py:**
+
 ```python
 # DN2.1: Verificação de campos (sessao_cliente, valor, destino)
 if sessao is None or modulo_fiscal is None or volume_docs is None:
@@ -119,12 +129,14 @@ return { "tracking_id": str(uuid.uuid4()), ... }
 A validação foi conduzida através de abordagem Test Data Driven (TDD) com 17 testes automatizados em `src/tests/test_mock_api.py`:
 
 **TestDN2IntegrityValidation (14 testes)**
+
 - 3 testes: Campos obrigatórios ausentes (sessao_cliente, valor, destino)
 - 4 testes: Validação de valor (negativo, zero, zero decimal, tipo string)
 - 4 testes: Payloads válidos (inteiro, decimal, valor mínimo, valor máximo)
 - 3 testes: Robustez (múltiplos campos ausentes, payload vazio, campos extras)
 
 **TestDN2ContractValidation (3 testes)**
+
 - Endpoint e status code HTTP
 - Headers obrigatórios ainda validados
 - Estrutura completa de resposta preservada
@@ -168,50 +180,125 @@ pytest src/tests/blue_team/validation.py::TestDN2ContractValidation -v
 ### Impacto na Qualidade
 
 Este direcionador contribui para:
+
 - **Confiabilidade:** Rejeição proativa de dados malformados
 - **Performance:** Validação anterior ao processamento assíncrono economiza recursos
 - **Rastreabilidade:** Garante que apenas lotes válidos recebem tracking_id
 - **Manutenibilidade:** Código testado com 14 cenários de negócio documentados
 
-## 1.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão
+## 2.1 DN1 (Red Team) - Testes Adversariais de Latência (SLA)
 
 ### Objetivo do Ativo Adversarial
+
+&emsp;Validar se a API de auditoria resiste a cenários de **estresse e carga** que visam **quebrar o SLA de latência** (DN1). O Red Team tenta degradar a resposta para além de 500 ms (alvo) e 650 ms (limite de alerta), de forma a expor fragilidades que o Blue Team não exercita.
+
+### Critérios de Ataque
+
+- **SLA alvo:** ≤ 500 ms (90% das requisições), conforme Blue Team.
+- **Limite de alerta:** 650 ms (30% acima do SLA). Qualquer resposta acima disso conta como violação.
+- **Sucesso do Red Team:** se ≥ 10% das requisições em um cenário ultrapassarem 650 ms (ou a média/p95 estourar), o teste **falha** e o ativo é considerado vulnerável ao cenário.
+
+### Bateria de Testes e Evolução da Carga
+
+&emsp;A suíte em `src/tests/red_team/response_time_red.py` foi evoluída em etapas, com **aumento progressivo da carga** até tentar quebrar o SLA. Abaixo, o que cada teste faz e os parâmetros usados na última versão:
+
+| Teste                 | Descrição                                                                              | Carga (versão final)                                  |
+| :-------------------- | :------------------------------------------------------------------------------------- | :---------------------------------------------------- |
+| **Baseline**          | Uma requisição válida; garante que o ambiente não já está lento.                       | 1 req                                                 |
+| **Burst sequencial**  | Muitas requisições leves em sequência para ver degradação por volume.                  | **600 req**                                           |
+| **Payload pesado**    | Um único JSON com milhares de campos extras (schema pollution) para estressar parsing. | **70.000 campos × 300 chars** (~21 MB)                |
+| **String gigante**    | Campo `destino` com string massiva para estressar memória e serialização.              | **10 MB**                                             |
+| **Burst concorrente** | Requisições em paralelo (threads) para simular pico de tráfego.                        | **60 workers × 12 req = 720 req** simultâneas         |
+| **Burst pesado**      | Sequência de requisições, cada uma com payload grande (volume + parsing).              | **100 req × 40.000 campos × 120 chars** (~4,8 MB/req) |
+
+**Evolução dos parâmetros (aumento progressivo):**
+
+- **Burst sequencial:** 30 → 100 → 250 → **600** requisições.
+- **Payload pesado:** 5k×50 → 15k×100 → 35k×200 → **70k×300** (campos × caracteres).
+- **String gigante:** 1 MB → 2 MB → 5 MB → **10 MB**.
+- **Burst concorrente:** 30×6 (180) → **60×12 (720)**.
+- **Burst pesado:** 50×20k×80 → **100×40k×120**.
+
+### Métricas e Logs
+
+&emsp;Cada cenário que gera múltiplos tempos (burst sequencial, concorrente e burst pesado) calcula e exibe:
+
+- **min, max, média e p95** (percentil 95) em ms.
+- **Conformidade:** quantidade e percentual de respostas com tempo ≤ 650 ms.
+
+&emsp;Exemplo de saída (burst):
+
+```
+[RED] Burst – resumo
+      min=109.68ms | max=492.39ms | média=310.27ms | p95=472.2ms
+      dentro do SLA (≤650ms): 100/100 (100.0%)
+```
+
+### Resultados Obtidos
+
+&emsp;Em todas as rodadas, **todos os testes passaram**: a API manteve respostas dentro do limite de 650 ms e, nos cenários com múltiplas requisições, a conformidade permaneceu ≥ 90%. Ou seja, nas condições atuais (ambiente local, TestClient in-process), o **Red Team não conseguiu quebrar o SLA**; o ativo se mostrou resiliente à bateria aplicada.
+
+- **Status final da suíte:** 6 testes, todos **PASSED**.
+- **Interpretação:** O ativo está preparado para os cenários de estresse documentados; em ambientes mais limitados (menos CPU/memória) ou com rede real, a mesma bateria pode ser reexecutada para revalidar.
+
+### Execução
+
+```bash
+# Via Makefile (recomendado)
+make stress
+
+# Direto com pytest
+.venv/bin/python -m pytest src/tests/red_team/response_time_red.py -v -s
+```
+
+## 2.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão
+
+### Objetivo do Ativo Adversarial
+
 &emsp;Esta seção apresenta os resultados da análise de segurança e robustez realizada pelo **Red Team** sobre o Direcionador de Negócio 2 (DN2 - Integridade de Dados). O objetivo é validar se o sistema de auditoria da **ASIS TaxTech** é capaz de resistir a entradas malformadas ou extremas que visam comprometer a integridade dos dados fiscais.
 
 ### Mapa de Direcionadores de Negócio - Red Team (DN2)
+
 &emsp;Foram implementados 5 direcionadores que testam os limites da lógica de validação:
 
-| ID | Direcionador Adversarial | Objetivo Técnico | Status |
-| :--- | :--- | :--- | :--- |
-| **DN2.R1** | **Script Injection** | Validar se o sistema trata payloads maliciosos (`<script>`) como texto comum. | **PASS** |
+| ID         | Direcionador Adversarial      | Objetivo Técnico                                                                      | Status   |
+| :--------- | :---------------------------- | :------------------------------------------------------------------------------------ | :------- |
+| **DN2.R1** | **Script Injection**          | Validar se o sistema trata payloads maliciosos (`<script>`) como texto comum.         | **PASS** |
 | **DN2.R2** | **Extreme Number Resilience** | Testar o comportamento da API com valores não finitos (`inf`, `nan`) ou astronômicos. | **FAIL** |
-| **DN2.R3** | **Schema Pollution** | Verificar se o excesso de campos (5.000+) causa degradação de performance. | **PASS** |
-| **DN2.R4** | **Strict Type Validation** | Tentar enviar estruturas complexas (listas) onde se espera um valor numérico. | **PASS** |
-| **DN2.R5** | **Buffer Stability** | Enviar strings massivas (1MB) para testar limites de memória do endpoint. | **PASS** |
+| **DN2.R3** | **Schema Pollution**          | Verificar se o excesso de campos (5.000+) causa degradação de performance.            | **PASS** |
+| **DN2.R4** | **Strict Type Validation**    | Tentar enviar estruturas complexas (listas) onde se espera um valor numérico.         | **PASS** |
+| **DN2.R5** | **Buffer Stability**          | Enviar strings massivas (1MB) para testar limites de memória do endpoint.             | **PASS** |
 
 ### Métodos de Testagem
+
 O teste foi conduzido utilizando o framework **pytest-9.0.2** em ambiente **Python 3.13.3**.
-* **Abordagem**: Foi utilizado o `FastAPI TestClient` para simular ataques de injeção de dados e poluição de schema.
-* **Escopo**: Foco exclusivo na validação de entrada (Input Validation) antes da geração do `tracking_id` e do processamento assíncrono.
+
+- **Abordagem**: Foi utilizado o `FastAPI TestClient` para simular ataques de injeção de dados e poluição de schema.
+- **Escopo**: Foco exclusivo na validação de entrada (Input Validation) antes da geração do `tracking_id` e do processamento assíncrono.
 
 ### Análise dos Resultados (Logs de Execução)
 
 A execução automatizada (`validation_red.py`) coletou 7 itens e identificou vulnerabilidades críticas no tratamento de números:
 
 ### **Sucessos de Resiliência**
-* **Injeção de Scripts**: O sistema tratou tags HTML/JS como literais, impedindo ataques de Cross-Site Scripting (XSS).
-* **Poluição de Schema**: A API processou 5.000 campos extras sem violar o SLA de tempo de resposta.
-* **Tipagem**: Tentativas de enviar listas no campo `valor` foram barradas com HTTP 400.
+
+- **Injeção de Scripts**: O sistema tratou tags HTML/JS como literais, impedindo ataques de Cross-Site Scripting (XSS).
+- **Poluição de Schema**: A API processou 5.000 campos extras sem violar o SLA de tempo de resposta.
+- **Tipagem**: Tentativas de enviar listas no campo `valor` foram barradas com HTTP 400.
 
 ### **Falhas Críticas Identificadas**
+
 O teste de **Resiliência Numérica** falhou em três cenários específicos:
+
 1. **ValueError (inf/nan)**: O `json.encoder` padrão do Python não é compatível com valores `inf` e `nan` fora do padrão JSON (RFC 8259). Isso causou a interrupção do cliente de teste.
 2. **Bypass de Regra (1e308)**: O sistema retornou **HTTP 201 Created** para um valor de $1 \times 10^{308}$, que embora positivo, é computacionalmente extremo e fiscalmente impossível. O sistema deveria ter retornado **HTTP 400**.
 
 ### Argumentação e Ações Corretivas
+
 Para que este ativo de software atinja o padrão de excelência, as seguintes ações de engenharia são necessárias:
-* **Validação de Finitude**: Implementar `math.isfinite(valor)` na `mock_api.py` para rejeitar infinitos.
-* **Limites de Sanidade**: Estabelecer um teto máximo para o campo `valor` condizente com a realidade de lotes fiscais da ASIS.
+
+- **Validação de Finitude**: Implementar `math.isfinite(valor)` na `mock_api.py` para rejeitar infinitos.
+- **Limites de Sanidade**: Estabelecer um teto máximo para o campo `valor` condizente com a realidade de lotes fiscais da ASIS.
 
 ---
 
