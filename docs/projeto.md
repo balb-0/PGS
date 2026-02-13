@@ -34,6 +34,8 @@
     - [Métricas de SLA e Alertas](#métricas-de-sla-e-alertas)
     - [Metodologia de Testagem (Blue Team)](#metodologia-de-testagem-blue-team)
     - [Resultados Obtidos](#resultados-obtidos)
+    - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn)
+    - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados)
   - [1.2 DN2 (Blue Team) - Integridade dos Dados Fiscais na Ingestão](#12-dn2-blue-team---integridade-dos-dados-fiscais-na-ingestão)
     - [Objetivo](#objetivo)
     - [Regras de Negócio](#regras-de-negócio)
@@ -41,7 +43,8 @@
     - [Metodologia de Testagem (TDD)](#metodologia-de-testagem-tdd)
     - [Resultados Obtidos](#resultados-obtidos-1)
     - [Execução dos Testes](#execução-dos-testes)
-    - [Impacto na Qualidade](#impacto-na-qualidade)
+    - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-1)
+    - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-1)
   - [1.3 DN3 (Blue Team) - Disponibilidade e Resiliência da API](#13-dn3-blue-team---disponibilidade-e-resiliência-da-api)
     - [Objetivo](#objetivo-1)
     - [Regras de Negócio](#regras-de-negócio-1)
@@ -51,7 +54,8 @@
     - [Metodologia de Testagem (Blue Team — TDD)](#metodologia-de-testagem-blue-team--tdd)
     - [Resultados Obtidos](#resultados-obtidos-2)
     - [Execução dos Testes](#execução-dos-testes-1)
-    - [Impacto na Qualidade](#impacto-na-qualidade-1)
+    - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-2)
+    - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-2)
   - [1.4 DN4 (Blue Team) - Não-Repúdio de Transações de Auditoria Fiscal](#14-dn4-blue-team---não-repúdio-de-transações-de-auditoria-fiscal)
     - [Objetivo](#objetivo-2)
     - [Especificação da API — Endpoint de Não-Repúdio](#especificação-da-api--endpoint-de-não-repúdio)
@@ -60,7 +64,8 @@
     - [Metodologia de Testagem (Blue Team — TDD)](#metodologia-de-testagem-blue-team--tdd-1)
     - [Resultados Obtidos](#resultados-obtidos-3)
     - [Execução dos Testes](#execução-dos-testes-2)
-    - [Impacto na Qualidade](#impacto-na-qualidade-2)
+    - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-3)
+    - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-3)
 - [2. Direcionadores Adversariais (Red Team)](#21-dn1-red-team---testes-adversariais-de-latência-sla)
   - [2.1 DN1 (Red Team) - Testes Adversariais de Latência (SLA)](#21-dn1-red-team---testes-adversariais-de-latência-sla)
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial)
@@ -68,18 +73,21 @@
     - [Bateria de Testes e Evolução da Carga](#bateria-de-testes-e-evolução-da-carga)
     - [Métricas e Logs](#métricas-e-logs)
     - [Resultados Obtidos](#resultados-obtidos-4)
+    - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações)
     - [Execução](#execução)
   - [2.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão](#22-dn2-red-team---integridade-dos-dados-fiscais-na-ingestão)
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-1)
     - [Mapa de Direcionadores de Negócio - Red Team (DN2)](#mapa-de-direcionadores-de-negócio---red-team-dn2)
     - [Métodos de Testagem](#métodos-de-testagem)
     - [Análise dos Resultados (Logs de Execução)](#análise-dos-resultados-logs-de-execução)
+    - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-1)
     - [Argumentação e Ações Corretivas](#argumentação-e-ações-corretivas)
   - [2.3 DN4 (Red Team) - Não-Repúdio sob Perspectiva Adversarial](#23-dn4-red-team---não-repúdio-sob-perspectiva-adversarial)
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-2)
     - [Mapa de Direcionadores de Negócio - Red Team (DN4)](#mapa-de-direcionadores-de-negócio---red-team-dn4)
     - [Métodos de Testagem](#métodos-de-testagem-1)
     - [Análise de Resultados](#análise-de-resultados)
+    - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-2)
     - [Ações Corretivas Recomendadas](#ações-corretivas-recomendadas)
   - [2.4 DN3 (Red Team) - Disponibilidade e Resiliência da API](#24-dn3-red-team---disponibilidade-e-resiliência-da-api)
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-3)
@@ -87,7 +95,7 @@
     - [Métodos de Testagem e Execução](#métodos-de-testagem-e-execução)
     - [Análise dos Resultados — Pontos Fortes](#análise-dos-resultados--pontos-fortes)
     - [Pontos de Quebra Identificados (FAIL)](#pontos-de-quebra-identificados-fail)
-    - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações)
+    - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-3)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -176,6 +184,30 @@ A API foi projetada para seguir a estrutura de referência exigida, mapeando as 
 - Latência Média: 373.43 ms
 
 - Comportamento de Alerta: O código monitorou proativamente os limites, não detectando violações de 650 ms durante o ciclo de teste.
+
+### Decisão Arquitetural e Contexto de BD/DN
+
+&emsp;A escolha de monitorar latência como primeiro direcionador reflete um risco de negócio central para a ASIS: o fluxo de ingestão de documentos fiscais opera com **alta intensidade** (lotes de milhares de documentos) e exige **precisão de atendimento** — qualquer degradação no tempo de resposta impacta diretamente a cadência de processamento dos clientes e pode gerar gargalos em cascata nos módulos subsequentes (EFD, NCM, etc.).
+
+&emsp;A decisão de implementar limiares de alerta a 650 ms (30% acima do SLA de 500 ms) decorre da necessidade de **detecção proativa de degradação**, permitindo que camadas de orquestração e futuros modelos de aprendizado de máquina reajam a tendências de lentidão antes que estas se tornem violações de SLA reais. O desenho assíncrono do processamento (geração de `tracking_id` como primeira resposta, processamento em background) é uma decisão arquitetural que separa a latência percebida pelo cliente da complexidade real de auditoria.
+
+### Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados
+
+**Aspectos positivos:**
+
+- O fluxo de ingestão mantém latência consistente (~373 ms de média), muito abaixo do SLA, preservando margem para crescimento de volume e intensidade de processamento.
+- A estrutura de métricas (min, max, média, P90) fornece base quantitativa para dashboards operacionais e futura calibração de auto-scaling ou modelos de aprendizado de máquina para detecção de anomalias de desempenho.
+- A separação entre resposta rápida (ID de processo) e processamento assíncrono é uma decisão arquitetural que protege a experiência do cliente independentemente da complexidade do lote fiscal.
+- O mecanismo de alertas automatizados (limiar de 650 ms) permite ação corretiva antes que a degradação afete o fluxo fim a fim de auditoria.
+
+**Aspectos negativos / fora do foco atual:**
+
+- Os testes de latência foram executados em ambiente local (TestClient in-process), sem rede real nem contenção de recursos. Em produção, variáveis como latência de rede, contenção de CPU/memória e concorrência real podem alterar os resultados.
+- Não foram testados cenários de degradação gradual (ex.: aumento progressivo de carga até ruptura) — esse aspecto é endereçado pelo Red Team (DN1).
+- A persistência assíncrona simulada não reflete a complexidade de um storage real (banco de dados, fila de mensagens), o que pode adicionar latência não capturada nos testes atuais.
+- Não há integração com ferramentas de APM (Application Performance Monitoring) em tempo real, limitando a visibilidade em ambientes distribuídos.
+
+**Justificativa de priorização:** A latência de ingestão foi escolhida como primeiro direcionador por ser o atributo de qualidade com impacto mais direto na operação diária dos clientes ASIS e na intensidade do fluxo fiscal. Limitações de tempo e acesso à infraestrutura real impediram testes com rede e storage reais, ficando como recomendação para fases futuras.
 
 ## 1.2 DN2 (Blue Team) - Integridade dos Dados Fiscais na Ingestão
 
@@ -284,14 +316,30 @@ pytest src/tests/blue_team/validation.py::TestDN2IntegrityValidation -v
 pytest src/tests/blue_team/validation.py::TestDN2ContractValidation -v
 ```
 
-### Impacto na Qualidade
+### Decisão Arquitetural e Contexto de BD/DN
 
-Este direcionador contribui para:
+&emsp;A validação rigorosa de payloads antes do processamento é uma decisão arquitetural derivada diretamente de um risco de negócio crítico: em um sistema de auditoria fiscal com **alto volume e intensidade de ingestão**, permitir que dados malformados avancem no pipeline consome recursos computacionais desnecessariamente e pode gerar resultados incorretos que comprometam a **precisão do atendimento** ao cliente. O padrão *fail-fast* (rejeitar antes de processar) foi adotado para proteger a integridade do fluxo fim a fim.
 
-- **Confiabilidade:** Rejeição proativa de dados malformados
-- **Performance:** Validação anterior ao processamento assíncrono economiza recursos
-- **Rastreabilidade:** Garante que apenas lotes válidos recebem tracking_id
-- **Manutenibilidade:** Código testado com 14 cenários de negócio documentados
+&emsp;A abordagem de validar **antes** de qualquer operação assíncrona (`await`) reflete uma escolha arquitetural consciente: garantir atomicidade e evitar que recursos de processamento, rastreio e armazenamento sejam alocados para dados que não atendem aos requisitos mínimos de negócio. Essa estratégia também cria uma base sólida para futuras camadas de **aprendizado de máquina**, já que modelos de detecção de anomalias ou classificação fiscal dependem de dados de entrada com integridade garantida.
+
+### Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados
+
+**Aspectos positivos:**
+
+- **Confiabilidade do fluxo fiscal:** Rejeição proativa de dados malformados impede que documentos inválidos contaminem o pipeline de auditoria, preservando a precisão de atendimento.
+- **Economia de recursos:** Validação anterior ao processamento assíncrono evita alocação desnecessária de CPU, memória e operações de I/O para dados que seriam descartados.
+- **Rastreabilidade consistente:** Apenas lotes válidos recebem `tracking_id`, garantindo que cada ID gerado corresponda a um processamento real — essencial para reconciliação, billing e análises de negócio.
+- **Base para automação e ML:** A qualidade garantida dos dados de entrada cria fundação confiável para modelos futuros de classificação de lotes, detecção de anomalias fiscais e aprendizado de máquina sobre padrões de ingestão.
+- **Manutenibilidade:** 17 cenários de teste documentados cobrem as regras de negócio de forma reprodutível.
+
+**Aspectos negativos / fora do foco atual:**
+
+- Não foram implementadas validações semânticas mais profundas (ex.: verificar se o `destino` corresponde a um módulo fiscal real cadastrado na ASIS), apenas validações estruturais e de tipo.
+- Valores extremos porém tecnicamente válidos (ex.: `valor = 1e308`) não são barrados pela validação atual — esse risco é explorado pelo Red Team (DN2.R2).
+- A validação de `destino` aceita qualquer string não vazia, sem conferir contra uma lista de módulos permitidos, o que pode gerar processamento de lotes para destinos inexistentes.
+- Não há mecanismo de rate limiting na camada de validação; requisições inválidas em alta frequência ainda consomem ciclos de validação, o que é mitigado pela camada de disponibilidade (DN3).
+
+**Justificativa de priorização:** A integridade de dados fiscais foi priorizada como segundo direcionador por ser pré-requisito para todos os demais: sem dados válidos, métricas de latência, disponibilidade e não-repúdio perdem significado. Limitações de tempo impediram a implementação de validações semânticas mais profundas (ex.: lista de módulos válidos, tetos fiscais), ficando como recomendação para evolução futura.
 
 ## 1.3 DN3 (Blue Team) - Disponibilidade e Resiliência da API
 
@@ -519,16 +567,32 @@ pytest src/tests/blue_team/availability.py::TestDN3Alertas -v
 pytest src/tests/blue_team/availability.py::TestDN3ContratoAPI -v
 ```
 
-### Impacto na Qualidade
+### Decisão Arquitetural e Contexto de BD/DN
 
-Este direcionador contribui para:
+&emsp;A implementação de mecanismos de disponibilidade e resiliência reflete uma decisão arquitetural advinda diretamente dos riscos de negócio identificados: o sistema de auditoria fiscal processa fluxos de **alta intensidade** e qualquer indisponibilidade impacta diretamente a cadeia de atendimento dos clientes ASIS. A combinação de rate limiting, circuit breaker, health check e idempotência forma uma arquitetura de defesa em profundidade que protege não apenas o serviço imediato, mas também sustenta a **precisão do atendimento** sob condições adversas.
 
-- **Disponibilidade:** Rate limiting e circuit breaker previnem sobrecarga e falhas em cascata
-- **Resiliência:** Degradação graciosa garante operação parcial em vez de falha total
-- **Observabilidade:** Health check e alertas permitem monitoramento contínuo e proativo
-- **Confiabilidade:** Idempotência impede reprocessamentos indevidos e duplicidades fiscais
-- **Escalabilidade:** Isolamento de rate limit por conta permite crescimento controlado
-- **Operabilidade:** Informações de `retry_after` e `rate_limit_remaining` facilitam integração por clientes
+&emsp;A escolha de implementar singletons de estado (`RateLimiter`, `CircuitBreaker`, `HealthChecker`, `IdempotencyStore`) é uma decisão de BD/DN: centralizar o controle de disponibilidade permite que o sistema reaja de forma coordenada a eventos de degradação, evitando decisões conflitantes entre componentes. O design de métricas em tempo real (`uptime`, `error_rate_percent`, `circuit_breaker`) não apenas serve para observabilidade operacional, mas cria uma **base de dados estruturada para futuros modelos de aprendizado de máquina** capazes de prever degradações, ajustar auto-scaling e otimizar roteamento de tráfego automaticamente.
+
+### Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados
+
+**Aspectos positivos:**
+
+- **Disponibilidade do fluxo fiscal:** Rate limiting e circuit breaker previnem sobrecarga e falhas em cascata, garantindo continuidade operacional mesmo sob picos de demanda.
+- **Resiliência com dignidade:** Degradação graciosa garante operação parcial (com informação útil ao cliente, como `retry_after`) em vez de falha total — decisão que preserva a confiança do parceiro no fluxo de auditoria.
+- **Observabilidade para decisões inteligentes:** Health check e alertas permitem monitoramento contínuo e proativo, com dados suficientes para alimentar painéis operacionais e futuros modelos de ML de detecção de anomalias.
+- **Precisão de atendimento:** Idempotência impede reprocessamentos indevidos e duplicidades fiscais, garantindo que cada operação de auditoria seja contabilizada com exatidão.
+- **Escalabilidade controlada:** Isolamento de rate limit por conta permite crescimento do número de clientes sem degradação cruzada.
+- **Integração facilitada:** Informações de `retry_after` e `rate_limit_remaining` nas respostas permitem que clientes ajustem automaticamente seu ritmo de envio.
+
+**Aspectos negativos / fora do foco atual:**
+
+- O `RateLimiter` utiliza um dicionário em memória sem política de expiração (TTL/eviction), o que representa risco de crescimento ilimitado de memória em ambientes com muitas contas — mapeado e explorado pelo Red Team (DN3.R6).
+- O `IdempotencyStore` apresenta comportamento de limitação implícita que pode não registrar todos os replays, reduzindo rastreabilidade em cenários de alta volumetria — explorado pelo Red Team (DN3.R8).
+- A sinalização de `idempotent_replay` apresenta inconsistência em cenários de colisão de chaves — explorado pelo Red Team (DN3.R3).
+- Não há persistência de estado entre reinicializações da API: se o serviço reiniciar, contadores de rate limit, estado do circuit breaker e store de idempotência são perdidos.
+- Os testes foram executados em ambiente single-node; em cenários distribuídos (múltiplas instâncias), os mecanismos de estado precisariam de um store compartilhado (Redis, por exemplo).
+
+**Justificativa de priorização:** A disponibilidade foi priorizada como terceiro direcionador por representar a camada de proteção do fluxo fim a fim: mesmo que dados e latência estejam corretos, indisponibilidade invalida toda a cadeia. A escolha por armazenamento em memória (vs. Redis/externo) foi uma decisão consciente para viabilizar execução local e testes reprodutíveis dentro das limitações de infraestrutura e tempo do projeto, com a arquitetura preparada para migração futura.
 
 ---
 
@@ -712,16 +776,32 @@ pytest src/tests/blue_team/non_repudiation.py::TestDN4Alertas -v
 pytest src/tests/blue_team/non_repudiation.py::TestDN4ContratoAPI -v
 ```
 
-### Impacto na Qualidade
+### Decisão Arquitetural e Contexto de BD/DN
 
-Este direcionador contribui para:
+&emsp;A implementação de não-repúdio decorre de um risco de negócio central em auditoria fiscal: a necessidade de **evidência irrefutável** de quem realizou cada transação, o quê foi processado e quando ocorreu. Em sistemas com **fluxos de alta intensidade** e múltiplos atores (clientes, auditores, sistemas automatizados), a ausência de mecanismos criptográficos de não-repúdio cria lacunas de responsabilidade que podem comprometer disputas fiscais, processos de compliance e a confiança dos clientes no atendimento da ASIS.
 
-- **Não-Repúdio:** Evidência criptográfica irrefutável de cada transação fiscal processada
-- **Segurança:** Assinatura HMAC-SHA256 impede adulteração de conteúdo pós-processamento
-- **Rastreabilidade:** Cadeia de autenticação vincula cada transação a um ator específico
-- **Auditabilidade:** Log com hash chain permite verificação retroativa de integridade
-- **Suporte ao Cliente:** Recibo digital completo serve como prova de processamento
-- **Monitoramento:** Sistema de alertas detecta proativamente anomalias nos mecanismos de não-repúdio
+&emsp;A escolha de HMAC-SHA256 como algoritmo de assinatura, combinada com hash chain no log de auditoria, é uma decisão arquitetural que equilibra **segurança criptográfica** com **eficiência computacional** — essencial para não comprometer a latência do fluxo de ingestão (DN1). O encadeamento de hashes no log cria uma trilha de auditoria com integridade verificável retroativamente, fornecendo base sólida para futuros sistemas de **aprendizado de máquina** em detecção de anomalias transacionais e para conformidade regulatória automatizada.
+
+### Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados
+
+**Aspectos positivos:**
+
+- **Não-repúdio verificável:** Evidência criptográfica irrefutável de cada transação fiscal, vinculando identidade (`actor`), conteúdo (`payload_hash`) e momento (`timestamp`) — essencial para resolução de disputas e compliance.
+- **Integridade do fluxo de auditoria:** A hash chain no log garante que qualquer adulteração retroativa seja detectada automaticamente, preservando a confiabilidade do histórico de processamento.
+- **Precisão de atendimento:** O recibo digital completo serve como prova de processamento para o cliente, eliminando ambiguidades sobre o que foi auditado e quando.
+- **Base para automação de compliance:** A estrutura de assinatura e log encadeado cria fundação para futuros sistemas de ML que podem detectar padrões anômalos de transações, tentativas de fraude e desvios regulatórios.
+- **Segurança por design:** A assinatura HMAC-SHA256 impede adulteração pós-processamento sem acesso à chave secreta, protegendo a integridade das evidências fiscais.
+- **Monitoramento proativo:** O sistema de alertas detecta campos de não-repúdio ausentes e cadeias de hash comprometidas antes que o impacto se propague.
+
+**Aspectos negativos / fora do foco atual:**
+
+- O mecanismo de autenticação atual (account-key/app-key via header) não implementa verificação criptográfica real de identidade — é uma simulação. Em produção, seria necessário autenticação forte (ex.: mTLS, OAuth 2.0 com assinatura de request).
+- Não há proteção anti-replay nativa: um atacante pode reenviar requisições idênticas sem bloqueio — risco explorado pelo Red Team (DN4.R1).
+- O log de auditoria é acessível sem restrição de escopo (qualquer account-key pode ler todo o log), representando risco de vazamento de informações entre tenants — explorado pelo Red Team (DN4.R4).
+- A chave secreta de HMAC é fixa e compartilhada; em produção, cada tenant deveria ter chaves rotativas com gestão adequada de ciclo de vida.
+- O armazenamento do log é em memória, sem persistência entre reinicializações, o que limita a auditabilidade em cenários reais.
+
+**Justificativa de priorização:** O não-repúdio foi priorizado como quarto direcionador por completar a cadeia de confiabilidade: latência garante velocidade, integridade garante correção, disponibilidade garante acesso, e não-repúdio garante responsabilidade. Limitações de tempo e escopo impediram a implementação de autenticação forte real, anti-replay e persistência de log, ficando como recomendações para evolução — decisões tomadas conscientemente para entregar evidência funcional dos mecanismos criptográficos dentro do prazo.
 
 ---
 
@@ -780,6 +860,28 @@ Este direcionador contribui para:
 - **Status final da suíte:** 6 testes, todos **PASSED**.
 - **Interpretação:** O ativo está preparado para os cenários de estresse documentados; em ambientes mais limitados (menos CPU/memória) ou com rede real, a mesma bateria pode ser reexecutada para revalidar.
 
+### Síntese de Impacto (Positivos x Negativos) e Priorizações
+
+&emsp;Do ponto de vista de BD/DN, os testes adversariais de latência validam se a **decisão arquitetural de processamento assíncrono** resiste à intensidade real de uso e a cenários extremos que o Blue Team não cobre.
+
+**Aspectos positivos (para além do foco imediato):**
+
+- O fluxo de auditoria manteve latência dentro dos limites mesmo sob **carga extrema** (720 requisições concorrentes, payloads de 21 MB, 600 requisições sequenciais), demonstrando que a decisão de separar resposta rápida de processamento background é sólida para cenários de alta intensidade.
+- O parsing de JSON mostrou resiliência a schema pollution (70.000 campos extras) e strings massivas (10 MB), indicando que o runtime FastAPI/Python consegue absorver payloads adversariais sem degradação catastrófica — informação relevante para dimensionamento de infraestrutura.
+- A evolução progressiva dos parâmetros de carga documenta os limiares testados, criando uma referência quantitativa para futuras avaliações de capacidade e para modelos de aprendizado de máquina que possam prever saturação com base em padrões de tráfego.
+
+**Aspectos negativos / riscos mapeados:**
+
+- Todos os testes foram executados em ambiente local (TestClient in-process), onde a latência de rede é zero e os recursos são exclusivos do teste. Em ambientes reais com contenção de CPU, memória limitada e latência de rede, os resultados provavelmente seriam diferentes.
+- Não foram testados cenários de degradação sustentada (ex.: carga alta mantida por minutos/horas), apenas rajadas pontuais. O comportamento sob carga constante pode revelar problemas de memory leak ou acúmulo de conexões.
+- O Red Team não conseguiu quebrar o SLA neste ambiente, o que pode indicar tanto robustez real quanto limitação do ambiente de teste para representar condições adversas reais.
+- Cenários de carga mista (requisições válidas e inválidas simultaneamente) não foram explorados, embora representem o padrão real de tráfego em produção.
+
+**Priorização sugerida:**
+1. **Revalidar em ambiente com rede real e contenção de recursos** — essencial para confirmar se a resiliência observada se mantém fora do ambiente ideal.
+2. **Adicionar testes de carga sustentada** — complementar as rajadas com cenários de estresse prolongado para mapear comportamento ao longo do tempo.
+3. **Combinar cenários de DN1 com DN3** — testar latência sob condições onde rate limiting e circuit breaker estejam ativos simultaneamente.
+
 ### Execução
 
 ```bash
@@ -832,12 +934,34 @@ O teste de **Resiliência Numérica** falhou em três cenários específicos:
 1. **ValueError (inf/nan)**: O `json.encoder` padrão do Python não é compatível com valores `inf` e `nan` fora do padrão JSON (RFC 8259). Isso causou a interrupção do cliente de teste.
 2. **Bypass de Regra (1e308)**: O sistema retornou **HTTP 201 Created** para um valor de $1 \times 10^{308}$, que embora positivo, é computacionalmente extremo e fiscalmente impossível. O sistema deveria ter retornado **HTTP 400**.
 
+### Síntese de Impacto (Positivos x Negativos) e Priorizações
+
+&emsp;Do ponto de vista de BD/DN, os testes adversariais de integridade validam se as decisões arquiteturais de validação *fail-fast* resistem a entradas maliciosas e extremas que o Blue Team não exercita, e se o fluxo de auditoria preserva a **precisão de atendimento** sob condições adversariais.
+
+**Aspectos positivos (para além do foco imediato):**
+
+- O sistema demonstrou **resiliência contra ataques de injeção** (XSS via `<script>`), tratando tags HTML/JS como literais — essencial para proteger o fluxo de dados fiscais contra vetores de ataque comuns em APIs web.
+- A validação de tipagem funcionou corretamente para estruturas complexas (listas no campo `valor`), indicando que a camada de validação está preparada para dados inesperados de integrações automatizadas.
+- O processamento de schema pollution (5.000 campos extras) não violou o SLA de tempo de resposta, mostrando que a arquitetura tolera payloads inflados sem degradação catastrófica — informação relevante para a intensidade do fluxo real, onde clientes podem enviar campos adicionais por erro de integração.
+- A cobertura adversarial complementa diretamente o Blue Team (DN2), criando um mapa de riscos que permite ao parceiro visualizar tanto o que foi protegido quanto o que permanece exposto.
+
+**Aspectos negativos / riscos mapeados:**
+
+- **Vulnerabilidade a valores extremos (DN2.R2):** O sistema aceita `1e308` como valor válido — fiscalmente impossível, mas numericamente positivo. Essa lacuna pode gerar distorções em métricas de volume, dashboards de negócio e modelos de ML que dependam de valores plausíveis.
+- **Falha com infinitos/NaN:** O `json.encoder` padrão do Python não suporta `inf`/`nan` (RFC 8259), causando interrupção do cliente. Embora seja uma limitação do runtime e não do sistema, a API deveria tratar esses valores antes que cheguem ao encoder.
+- Não foram testados cenários de injeção SQL (embora a API atual não use banco relacional, é um vetor relevante para evolução futura).
+- Não há validação semântica do campo `destino` contra uma lista de módulos fiscais reais da ASIS, o que permite processamento de lotes para destinos inexistentes.
+
 ### Argumentação e Ações Corretivas
 
-Para que este ativo de software atinja o padrão de excelência, as seguintes ações de engenharia são necessárias:
+Para que este ativo de software evolua em alinhamento com os riscos de negócio identificados, as seguintes ações são recomendadas, ordenadas por prioridade:
 
-- **Validação de Finitude**: Implementar `math.isfinite(valor)` na `mock_api.py` para rejeitar infinitos.
-- **Limites de Sanidade**: Estabelecer um teto máximo para o campo `valor` condizente com a realidade de lotes fiscais da ASIS.
+1. **Validação de Finitude (alta prioridade):** Implementar `math.isfinite(valor)` na `mock_api.py` para rejeitar infinitos e NaN antes do processamento — correção pontual com impacto direto na precisão dos dados.
+2. **Limites de Sanidade (alta prioridade):** Estabelecer um teto máximo para o campo `valor` condizente com a realidade de lotes fiscais da ASIS (ex.: volume máximo documentado por sessão de auditoria).
+3. **Validação de módulos válidos (média prioridade):** Implementar lista de valores permitidos para `destino`, evitando processamento para módulos inexistentes.
+4. **Proteção contra injeção SQL (baixa prioridade para escopo atual):** Adicionar sanitização preventiva para cenários de evolução com banco de dados relacional.
+
+**Justificativa de priorização:** As correções 1 e 2 são rápidas e endereçam falhas identificadas pelo Red Team com impacto direto na integridade do fluxo fiscal. As demais são recomendações para evolução, limitadas pelo tempo disponível e pelo escopo de simulação (mock API sem banco real).
 
 ---
 
@@ -870,11 +994,33 @@ Para que este ativo de software atinja o padrão de excelência, as seguintes a�
 - **Pontos fortes**: HMAC está corretamente vinculado ao payload/timestamp; adulteração da hash chain é detectada com alerta.
 - **Lacunas críticas**: ausência de anti-replay e ausência de controle real de autenticação/autorização baseado em `account-key`/`app-key`.
 
+### Síntese de Impacto (Positivos x Negativos) e Priorizações
+
+&emsp;Do ponto de vista de BD/DN, os testes adversariais de não-repúdio validam se as **decisões criptográficas e de auditoria** implementadas pelo Blue Team resistem a ataques realistas que exploram lacunas de autenticação, autorização e controle de replay — aspectos críticos para a confiabilidade do fluxo fiscal e a precisão do atendimento.
+
+**Aspectos positivos (para além do foco imediato):**
+
+- A **vinculação HMAC ao payload e timestamp** (DN4.R3 PASS) confirma que o mecanismo de assinatura é robusto: um atacante que adultere o conteúdo da transação não consegue gerar uma assinatura válida sem acesso à chave secreta. Isso sustenta a integridade do fluxo de auditoria fiscal como evidência.
+- A **detecção de adulteração na hash chain** (DN4.R5 PASS) demonstra que o log de auditoria é resistente a modificações retroativas, preservando a cadeia de evidências para compliance, auditorias regulatórias e futuros modelos de aprendizado de máquina que analisem padrões transacionais ao longo do tempo.
+- Os mecanismos criptográficos implementados (HMAC-SHA256, SHA-256 para actor e payload, hash chain) formam uma base de segurança que, embora não completa, já reduz significativamente o risco de repúdio em comparação com sistemas sem qualquer evidência criptográfica.
+
+**Aspectos negativos / riscos mapeados:**
+
+- **Ausência de anti-replay (DN4.R1 FAIL):** Um atacante pode reenviar requisições válidas sem bloqueio, o que em um cenário fiscal pode resultar em duplicação de auditorias, distorção de métricas e potenciais implicações regulatórias.
+- **Header impersonation não bloqueado (DN4.R2 FAIL):** A ausência de autenticação forte permite que qualquer agente forje `account-key` de terceiros e realize transações em nome de outro cliente — risco crítico para a confiabilidade do campo `actor` e para a rastreabilidade do fluxo de atendimento.
+- **Log de auditoria sem controle de acesso (DN4.R4 FAIL):** Qualquer credencial pode ler todo o log, expondo informações de outros tenants — risco de vazamento de dados fiscais entre clientes.
+- As falhas identificadas são de **autenticação e autorização**, não de criptografia — indicando que a camada matemática está sólida, mas a camada de controle de acesso precisa de evolução.
+
 ### Ações Corretivas Recomendadas
 
-- Implementar autenticação forte para `account-key`/`app-key` (assinatura de request, chave registrada e verificação server-side).
-- Adicionar proteção anti-replay (nonce + janela temporal + armazenamento de IDs de idempotência).
-- Restringir leitura de log por escopo de ator/tenant e aplicar checagem de permissão nos endpoints `GET /api/v1/audit-log*`.
+&emsp;Ordenadas por prioridade e impacto no risco de negócio:
+
+1. **Implementar autenticação forte (alta prioridade):** Substituir o mecanismo atual de `account-key`/`app-key` por assinatura de request, chave registrada e verificação server-side (ex.: HMAC de request, mTLS ou OAuth 2.0). Endereça DN4.R2.
+2. **Adicionar proteção anti-replay (alta prioridade):** Nonce + janela temporal + armazenamento de IDs de idempotência, impedindo reenvio de requisições já processadas. Endereça DN4.R1.
+3. **Restringir acesso ao log por tenant/ator (média prioridade):** Aplicar checagem de permissão nos endpoints `GET /api/v1/audit-log*`, garantindo que cada cliente acesse apenas suas próprias transações. Endereça DN4.R4.
+4. **Rotação de chaves HMAC (recomendação futura):** Implementar gestão de ciclo de vida de chaves secretas, com rotação periódica e suporte a múltiplas chaves ativas para transição suave.
+
+**Justificativa de priorização:** As ações 1 e 2 endereçam os riscos mais críticos identificados pelo Red Team (impersonação e replay), que comprometem diretamente a confiabilidade do não-repúdio em um contexto fiscal. A ação 3 protege dados entre tenants. A ação 4 é recomendação de maturidade para produção. Limitações de tempo, escopo do mock e acesso a infraestrutura de autenticação real definiram o recorte atual.
 
 ## 2.4 DN3 (Red Team) - Disponibilidade e Resiliência da API
 
