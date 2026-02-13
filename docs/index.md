@@ -1,15 +1,15 @@
 <Table>
   <tr>
-    <td><a href= "link"><img src="img/logo.png" alt="Nome" border="0"></td>
+    <td><a href= "https://www.sankhya.com.br/software-de-gestao-erp/erp-para-gestao-empresarial/produtos/asis/"><img src="img/asis.png" alt="Asis" border="0"></td>
     <td>
       <a href= "https://www.inteli.edu.br/"><img src="img/logo-Inteli.png" alt="Inteli - Instituto de Tecnologia e Liderança" border="0"></a>
     </td>
   </tr>
 </table>
 
-# Nome do Projeto: <nome do projeto>
+# Nome do Projeto: P.G.S (Projeto do Grupo Seis)
 
-## Nome do Grupo: <nome do grupo>
+## Nome do Grupo: O.G.S (O Grupo Seis)
 
 
 Esta documentação está organizada em diferentes arquivos conforme apresentado abaixo.
