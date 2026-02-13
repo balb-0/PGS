@@ -13,14 +13,13 @@
 
 ## Integrantes:
 
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
+- <a href="https://www.linkedin.com/in/arthur-bretas/">Arthur Bretas Oliveira</a>
+- <a href="https://www.linkedin.com/in/daviversan/">Davi D'avila Versan</a>
+- <a href="https://www.linkedin.com/in/gabriel-nascimento3/">Gabriel Santos do Nascimento</a>
+- <a href="https://www.linkedin.com/in/nicolasramons/">Nicolas Ramon da Silva</a>
+- <a href="https://www.linkedin.com/in/otavio-vasc/">Otavio de Carvalho Vasconcelos</a>
+- <a href="https://www.linkedin.com/in/vitor-balbo/">Vitor Margarido Balbo</a>
+- <a href="https://www.linkedin.com/in/viniciussavian/">Vinicius dos Reis Savian</a>
 
 
 # Sumário

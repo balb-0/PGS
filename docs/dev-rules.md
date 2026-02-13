@@ -13,126 +13,162 @@
 
 ## Integrantes:
 
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
-- <a href="https://www.linkedin.com/in/username/">Nome</a>
+- <a href="https://www.linkedin.com/in/arthur-bretas/">Arthur Bretas Oliveira</a>
+- <a href="https://www.linkedin.com/in/daviversan/">Davi D'avila Versan</a>
+- <a href="https://www.linkedin.com/in/gabriel-nascimento3/">Gabriel Santos do Nascimento</a>
+- <a href="https://www.linkedin.com/in/nicolasramons/">Nicolas Ramon da Silva</a>
+- <a href="https://www.linkedin.com/in/otavio-vasc/">Otavio de Carvalho Vasconcelos</a>
+- <a href="https://www.linkedin.com/in/vitor-balbo/">Vitor Margarido Balbo</a>
+- <a href="https://www.linkedin.com/in/viniciussavian/">Vinicius dos Reis Savian</a>
 
 # Sumário
 
-
+- [1. Introdução](#1-introdução)
+  - [1.1 Objetivo do Documento](#11-objetivo-do-documento)
+- [2. Padrões de Codificação (Python)](#2-padrões-de-codificação-python)
+  - [2.1 Convenções de Nomenclatura](#21-convenções-de-nomenclatura)
+  - [2.2 Formatação e Estilo](#22-formatação-e-estilo)
+  - [2.3 Importações e Organização de Módulos](#23-importações-e-organização-de-módulos)
+  - [2.4 Tratamento de Erros e Contratos](#24-tratamento-de-erros-e-contratos)
+  - [2.5 Boas práticas FastAPI](#25-boas-práticas-fastapi)
+- [3. Padrões de Projeto e Estrutura do Repositório](#3-padrões-de-projeto-e-estrutura-do-repositório)
+  - [3.1 Estrutura em `src/`](#31-estrutura-em-src)
+  - [3.2 Princípios adotados](#32-princípios-adotados)
+- [4. Práticas de Desenvolvimento](#4-práticas-de-desenvolvimento)
+  - [4.1 Testes Automatizados (pytest)](#41-testes-automatizados-pytest)
+  - [4.2 Qualidade e Revisão](#42-qualidade-e-revisão)
+  - [4.3 Execução local (Makefile)](#43-execução-local-makefile)
+- [5. Ferramentas e Tecnologias](#5-ferramentas-e-tecnologias)
+  - [5.1 Ferramentas](#51-ferramentas)
+  - [5.2 Tecnologias e Bibliotecas](#52-tecnologias-e-bibliotecas)
 
 # 1. Introdução
-_conteúdo_
+Este documento consolida padrões de codificação e práticas de desenvolvimento para manter **consistência**, **qualidade** e **reprodutibilidade** no projeto.
+
+O repositório é centrado em uma **API FastAPI** (em `src/core/mock_api.py`) e em **testes automatizados com pytest** organizados por contexto (Blue Team e Red Team) em `src/tests/`.
 
 ## 1.1 Objetivo do Documento
 
-Este documento apresenta estabelecer padrões de codificação e práticas de desenvolvimento para garantir a qualidade e a consistência do código.
+Definir regras claras para:
 
-Nota: Explicar a importância de seguir padrões de desenvolvimento para facilitar a manutenção, melhorar a legibilidade e promover a colaboração.
+- reduzir divergências de estilo entre autores;
+- facilitar leitura, revisão e manutenção;
+- manter a API e a suíte de testes alinhadas aos Direcionadores de Negócio (BD/DN);
+- garantir execução reproduzível localmente e em esteira (quando aplicável).
 
-# 2. Padrões de Codificação
-_conteúdo_
+# 2. Padrões de Codificação (Python)
 
-## 2.1 Naming Conventions
+As regras abaixo refletem o padrão adotado no código de `src/` (FastAPI + pytest).
 
-- Variáveis e Funções: Utilize camelCase
-  - Exemplos:
-    - ```let userName = "John";``` 
-    - ```function calculateTotal() { ... } 
+## 2.1 Convenções de Nomenclatura
 
-- Classes e Interfaces: Utilize PascalCase
-  - Exemplos:
-    - ```class UserProfile { ... }``` 
-    - ```interface PaymentGateway { ... }```  
+- **Variáveis e funções**: `snake_case`
+  - Ex.: `processar_auditoria`, `processar_auditoria_resiliente`, `reset_availability_state`
+- **Classes**: `PascalCase`
+  - Ex.: `TestDN2IntegrityValidation`, `TestDN3RedTeam`
+- **Constantes**: `UPPER_CASE`
+  - Ex.: `HEADERS_VALIDOS`, `HEADERS`
+- **Arquivos e módulos**: `snake_case.py`
+  - Ex.: `mock_api.py`, `availability.py`, `non_repudiation.py`
+- **Rotas e versões**: manter padrão `/api/v1/...` e nomes semânticos (ex.: `/auditar`, `/auditar/resilient`, `/health`)
 
-- Constantes: Utilize UPPER_CASE com underscores
-  - Exemplo:
-    - const MAX_USERS = 100; 
+## 2.2 Formatação e Estilo
 
-## 2.2 Formatação de Código
+- **Indentação**: 4 espaços (PEP 8).
+- **Comprimento de linha**: preferencialmente até 100 caracteres (quebrar linhas longas quando necessário).
+- **Strings e JSON**: preferir aspas duplas (`"`) ao montar exemplos de payload/response para manter consistência visual com JSON.
+- **Tipagem**: quando útil, usar type hints (`Dict[str, Any]`, `Optional[str]`, etc.) e manter assinaturas legíveis.
+- **Docstrings**: manter docstrings concisas para módulos, classes e endpoints, descrevendo objetivo e regras de negócio aplicadas.
 
-- Indentação: Utilize 2 espaços para indentação.
-- Linhas: Mantenha o comprimento das linhas em até 80 caracteres.
-- Chaves: Coloque chaves de abertura na mesma linha.
-  - Exemplo:
-    ```
-    if (condition) {
-        // código
-    }
-    ```
+## 2.3 Importações e Organização de Módulos
 
-## 2.3 Comentários e Documentação
+- **Agrupamento de imports** (nesta ordem):
+  - standard library (ex.: `uuid`, `asyncio`, `random`)
+  - terceiros (ex.: `fastapi`, `pytest`)
+  - internos (ex.: `from core.availability import ...`)
+- **Imports internos**: manter referências a `core.*` para módulos em `src/core/`.
+- **Evitar circularidade**: regras de disponibilidade e não-repúdio ficam em módulos dedicados e são importadas pela `mock_api.py`.
 
-- Comentários de Linha: Use para explicar lógica complexa.
-  - Exemplo: // Calcula o total com desconto
+## 2.4 Tratamento de Erros e Contratos
 
-- Comentários de Bloco: Use para documentar funções e classes com JSDoc.
-  - Exemplo: 
-    ```
-    /**
-    * Calcula o total de um pedido.
-    * @param {number} price - Preço do item.
-    * @param {number} quantity - Quantidade do item.
-    * @returns {number} Total calculado.
-    */
-    function calculateTotal(price, quantity) {
-        return price * quantity;
-    }
-    ```
+- **HTTP status codes coerentes com a regra**:
+  - `400` para payload inválido (DN2)
+  - `404` para recurso não encontrado (ex.: consulta por posição inexistente no log)
+  - `429` para rate limiting (DN3)
+  - `503` para indisponibilidade por proteção (circuit breaker / degradação graciosa)
+- **Sem efeitos colaterais em erro**: validações devem ocorrer antes de gerar `tracking_id` e antes de iniciar processamento assíncrono.
+- **Mensagens claras**: o campo `detail` deve indicar o motivo de falha de forma objetiva.
 
-- Documentação da API
-  - Utilizar SWAGGER para documentação da API a partir dos comentários do código.
-  - Configure uma rota, como /api-docs, para que a documentação gerada pelo Swagger seja facilmente acessível aos desenvolvedores e stakeholders.
+## 2.5 Boas práticas FastAPI
 
-# 3. Padrões de Projeto
-_conteúdo_
+- **Rotas versionadas**: manter o padrão `/api/v1/...`.
+- **Headers obrigatórios**: declarar via `Header(...)` (ex.: `account_key`, `app_key`) e manter consistência nos testes.
+  - Observação: o FastAPI converte `_` em `-` nos nomes de headers HTTP; por isso os testes usam `account-key`, `app-key` e `idempotency-key`.
+- **Documentação automática**: manter título/versão no `FastAPI(...)` e docstrings nos endpoints. A documentação OpenAPI é exposta em `/docs` e `/openapi.json` (padrão FastAPI).
 
-## 3.1 Design Patterns
+# 3. Padrões de Projeto e Estrutura do Repositório
 
-_Opcionalmente, o grupo pode definir um ou mais design patterns para serem adotados, como forma de exercitarem tipos de solução para problemas/situações recorrentes_
-_Sugestão de leitura: https://refactoring.guru/_
+## 3.1 Estrutura em `src/`
 
-## 3.2 Arquitetura de Software
+- `src/core/`: implementação da API mock e módulos de suporte.
+  - `mock_api.py`: aplicação FastAPI e endpoints principais.
+  - `availability.py`: componentes de disponibilidade/resiliência (rate limiter, circuit breaker, health checker, idempotência, degradação graciosa).
+  - `non_repudiation.py`: funções e estruturas para não-repúdio (assinatura, recibo, log encadeado).
+- `src/tests/blue_team/`: testes voltados a critérios de aceite e conformidade.
+- `src/tests/red_team/`: testes adversariais para explorar limites e lacunas.
 
-- Utilize a Arquitetura de Três Camadas: Separe a lógica de negócios (Camada de Negócios), a interface do usuário (Camada de Apresentção) e o acesso aos dados (Camada de Dados).
-  - Exemplo: Em uma aplicação Angular, utilize serviços para lógica de negócios, componentes para a interface e controladores para gerenciar a interação.
+## 3.2 Princípios adotados
+
+- **Separação de responsabilidades**: regras de disponibilidade e não-repúdio ficam em módulos dedicados (evita acoplamento desnecessário).
+- **Coesão por DN**: organização de código e testes segue Direcionadores de Negócio (DN2, DN3, DN4).
+- **Reprodutibilidade**: quando houver aleatoriedade/sleep na API mock, testes podem usar `monkeypatch` para controlar tempo e garantir consistência (como no Red Team).
 
 # 4. Práticas de Desenvolvimento
-_conteúdo_
+As práticas abaixo orientam como evoluímos `src/` com segurança e consistência.
 
-## 4.1 Testes Automatizados
+## 4.1 Testes Automatizados (pytest)
 
-- Testes Unitários: Utilize Jest para criar testes unitários
-  - Exemplo:
-    ```
-    test('adiciona 1 + 2 para igualar 3', () => {
-      expect(1 + 2).toBe(3);
-    });
-    ```
+- **Framework**: `pytest` + `fastapi.testclient.TestClient` (padrão do repositório).
+- **Blue Team (`src/tests/blue_team/`)**: valida critérios de aceite e regras de negócio (ex.: DN2 e DN4).
+- **Red Team (`src/tests/red_team/`)**: simula comportamento adversarial para tensionar resiliência e contratos (ex.: DN3).
+- **Regras**:
+  - cada teste deve validar um comportamento observável (status code + invariantes de resposta);
+  - evitar flakiness: controlar delays/aleatoriedade quando necessário (ex.: monkeypatch do `random.uniform`).
 
-- Testes de Integração: Como sugestão, utilizar o Cypress para testes de integração.
-  - Exemplo: Testar a interação entre componentes de frontend e backend.
+## 4.2 Qualidade e Revisão
 
-- Testes end-to-end: Como sugestão, utilizar o Cypress para testes end-to-end. 
-  - Exemplo: Testar um RF de ponta a ponta.
+- Toda mudança deve ser revisável e explicável:
+  - docstrings e comentários devem focar no **porquê**;
+  - commits pequenos e objetivos (ver `docs/gestao-configuração.md`).
+- Antes de abrir um MR, rodar localmente as suítes relevantes para a mudança.
 
-## 4.2 Controle de Qualidade
+## 4.3 Execução local (Makefile)
 
-- Revisão de Código: Todos os commits devem ser revisados por pelo menos um outro desenvolvedor.
+O repositório oferece atalhos no `Makefile` para reduzir variação entre ambientes:
 
-- Sugestão: Utilizar ESLint para análise estática de código JavaScript/TypeScript.
+- `make run`: sobe a API (`uvicorn src.core.mock_api:app --reload`)
+- `make test-dn2`: roda testes de integridade (DN2)
+- `make test-nr`: roda testes de não-repúdio (DN4)
+- `make test-all`: roda as suítes principais (DN2 + DN4)
+- `make stress`: executa teste de carga/latência (DN1)
 
 # 5. Ferramentas e Tecnologias
 
-## 5.1 Ferramentas de Desenvolvimento
+## 5.1 Ferramentas
 
-- Editor de Código: Utilize Visual Studio Code como editor padrão.
+- **Editor/IDE**: VS Code ou Cursor (recomendado: extensão Python).
+- **Git**: versionamento e colaboração via branches + Merge Requests (GitLab).
+- **Makefile**: atalhos padronizados para execução e testes (`make run`, `make test-all`, etc.).
 
-- Plugins recomendados: ESLint, Prettier, GitLens.
+Ferramentas opcionais (não obrigatórias no estado atual do repositório):
 
-## 5.2 Tecnologias e Frameworks
+- **GitLens**: apoio à revisão/histórico dentro do editor.
+- **Formatador/Linter Python** (ex.: Black/Ruff): automatiza consistência de estilo quando/ se o time decidir adotar.
+
+## 5.2 Tecnologias e Bibliotecas
+
+- **Python**
+- **FastAPI** (API mock e OpenAPI)
+- **Uvicorn** (servidor ASGI local)
+- **Pytest** (testes automatizados)
+- **HTTPX** e **Requests** (clientes HTTP usados em testes/scripts, conforme necessidade)
