@@ -16,7 +16,19 @@ from core.non_repudiation import (
     check_chain_alert,
 )
 
-app = FastAPI(title="MOCK_API_G6 - ASIS TaxTech", version="1.1.0")
+from core.availability import (
+    rate_limiter,
+    circuit_breaker,
+    health_checker,
+    idempotency_store,
+    build_degraded_response,
+    check_availability_alert,
+    check_circuit_alert,
+    check_rate_limit_alert,
+    CircuitState,
+)
+
+app = FastAPI(title="MOCK_API_G6 - ASIS TaxTech", version="1.2.0")
 
 
 @app.post("/api/v1/auditar", status_code=201)
@@ -183,3 +195,120 @@ async def get_audit_log_entry(
     if entry is None:
         raise HTTPException(status_code=404, detail="Entrada não encontrada no log de auditoria")
     return entry
+
+
+# =============================================================================
+# DN3 — Disponibilidade e Resiliência da API
+# =============================================================================
+
+@app.get("/api/v1/health", status_code=200)
+async def health_check():
+    """
+    DN3.3 - Health Check da API
+
+    Retorna o estado de saúde da API, incluindo uptime, taxa de erro,
+    estado do circuit breaker e rate limiter.
+    """
+    status = health_checker.get_status()
+    status["circuit_breaker"] = circuit_breaker.state.value
+    status["availability_alert"] = check_availability_alert(health_checker)
+    status["circuit_alert"] = check_circuit_alert(circuit_breaker)
+    return status
+
+
+@app.post("/api/v1/auditar/resilient", status_code=201)
+async def processar_auditoria_resiliente(
+    account_key: str = Header(...),
+    app_key: str = Header(...),
+    idempotency_key: str = Header(None),
+    payload: Dict[str, Any] = Body(...)
+):
+    """
+    DN3 - Endpoint de auditoria com camada completa de resiliência.
+
+    Aplica rate limiting, circuit breaker, idempotência e degradação
+    graciosa sobre o processamento de auditoria fiscal.
+    """
+    # DN3.1: Rate Limiting
+    if not rate_limiter.is_allowed(account_key):
+        health_checker.record_request(success=False)
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit excedido. Tente novamente mais tarde."
+        )
+
+    # DN3.4: Idempotência — se a chave já existe, retorna resultado anterior
+    if idempotency_key:
+        cached = idempotency_store.get(idempotency_key)
+        if cached is not None:
+            health_checker.record_request(success=True)
+            cached["idempotent_replay"] = True
+            return cached
+
+    # DN3.2: Circuit Breaker
+    if not circuit_breaker.allow_request():
+        health_checker.record_request(success=False)
+        # DN3.5: Degradação Graciosa
+        degraded = build_degraded_response(
+            payload,
+            reason="Circuit breaker aberto — serviço temporariamente indisponível"
+        )
+        degraded["availability"] = {
+            "circuit_state": circuit_breaker.state.value,
+            "alert": check_circuit_alert(circuit_breaker),
+        }
+        raise HTTPException(status_code=503, detail=degraded)
+
+    # --- Reutilizar validações DN2 ---
+    sessao = payload.get("sessao_cliente")
+    volume_docs = payload.get("valor")
+    modulo_fiscal = payload.get("destino")
+
+    if sessao is None or modulo_fiscal is None or volume_docs is None:
+        health_checker.record_request(success=False)
+        circuit_breaker.record_failure()
+        raise HTTPException(status_code=400, detail="Parâmetros obrigatórios ausentes")
+
+    if not isinstance(volume_docs, (int, float)) or volume_docs <= 0:
+        health_checker.record_request(success=False)
+        circuit_breaker.record_failure()
+        raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
+
+    try:
+        await asyncio.sleep(random.uniform(0.1, 0.5))
+
+        response_data = {
+            "id": random.randint(20000, 30000),
+            "status": 201,
+            "tracking_id": str(uuid.uuid4()),
+            "arquivold": random.randint(22000, 23000),
+            "diagnostico": "Conforme",
+            "detalhes": {
+                "cliente": sessao,
+                "volume_processado": volume_docs,
+                "modulo": modulo_fiscal
+            },
+            "availability": {
+                "circuit_state": circuit_breaker.state.value,
+                "rate_limit_remaining": rate_limiter.remaining(account_key),
+                "idempotent_replay": False,
+                "alert": check_rate_limit_alert(rate_limiter, account_key),
+            }
+        }
+
+        circuit_breaker.record_success()
+        health_checker.record_request(success=True)
+
+        # DN3.4: Armazenar resultado para idempotência
+        if idempotency_key:
+            idempotency_store.store(idempotency_key, response_data)
+
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception:
+        circuit_breaker.record_failure()
+        health_checker.record_request(success=False)
+        degraded = build_degraded_response(payload, reason="Erro interno no processamento")
+        raise HTTPException(status_code=503, detail=degraded)
