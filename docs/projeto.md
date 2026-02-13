@@ -404,3 +404,33 @@ Este direcionador contribui para:
 - **Monitoramento:** Sistema de alertas detecta proativamente anomalias nos mecanismos de não-repúdio
 
 ---
+
+## 1.5 DN4 (Red Team) - Não-Repúdio sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+&emsp;Esta seção documenta a validação ofensiva do DN4 para medir resistência a ataques de **replay**, **impersonação via headers** e **exposição de trilha de auditoria**. O foco é verificar se os mecanismos de não-repúdio permanecem robustos quando um atacante tenta abusar de lacunas de autenticação e autorização.
+
+### Mapa de Direcionadores de Negócio - Red Team (DN4)
+&emsp;Foram implementados 5 direcionadores adversariais:
+
+| ID | Direcionador Adversarial | Objetivo Técnico | Status |
+| :--- | :--- | :--- | :--- |
+| **DN4.R1** | **Replay Blocking** | Reenviar payload idêntico em janela curta e validar bloqueio por anti-replay. | **FAIL** |
+| **DN4.R2** | **Header Impersonation** | Forjar `account-key` de terceiro e validar rejeição de identidade não autenticada. | **FAIL** |
+| **DN4.R3** | **Signature Binding** | Confirmar que assinatura HMAC não valida payload adulterado. | **PASS** |
+| **DN4.R4** | **Audit Log Authorization** | Tentar ler `/api/v1/audit-log` com credenciais não relacionadas ao ator original. | **FAIL** |
+| **DN4.R5** | **Tamper Detection** | Adulterar hash de entrada e validar detecção de quebra de cadeia. | **PASS** |
+
+### Métodos de Testagem
+- Script adversarial: `src/tests/red_team/non_repudiation_red.py`
+- Abordagem: `FastAPI TestClient` com simulação de atacante e intruso entre contas.
+- Escopo: endpoint `POST /api/v1/auditar/nr` e consultas `GET /api/v1/audit-log`.
+
+### Análise de Resultados
+- **Pontos fortes**: HMAC está corretamente vinculado ao payload/timestamp; adulteração da hash chain é detectada com alerta.
+- **Lacunas críticas**: ausência de anti-replay e ausência de controle real de autenticação/autorização baseado em `account-key`/`app-key`.
+
+### Ações Corretivas Recomendadas
+- Implementar autenticação forte para `account-key`/`app-key` (assinatura de request, chave registrada e verificação server-side).
+- Adicionar proteção anti-replay (nonce + janela temporal + armazenamento de IDs de idempotência).
+- Restringir leitura de log por escopo de ator/tenant e aplicar checagem de permissão nos endpoints `GET /api/v1/audit-log*`.
