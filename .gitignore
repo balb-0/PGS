@@ -1,0 +1,34 @@
+# --- SEGURANÇA E CONGRUÊNCIA ASIS ---
+.env
+*.env
+config.json
+secrets.py
+credentials/
+
+# --- PYTHON ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- RELATÓRIOS E LOGS ---
+# Ignorar logs de execução e relatórios temporários
+reports/*.html
+reports/*.json
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- SISTEMA OPERACIONAL E EDITORES ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
