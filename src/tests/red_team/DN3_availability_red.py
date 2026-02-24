@@ -14,9 +14,9 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.mock_api import app  # noqa: E402
-import core.mock_api as mock_api_module  # noqa: E402
-from core.availability import (  # noqa: E402
+from core.api import app  # noqa: E402
+import core.api as mock_api_module  # noqa: E402
+from core.api import (  # noqa: E402
     rate_limiter,
     circuit_breaker,
     health_checker,
