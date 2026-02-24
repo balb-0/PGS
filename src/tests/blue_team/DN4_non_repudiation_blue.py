@@ -32,8 +32,8 @@ from pathlib import Path
 # Adicionar o caminho ao src para importar os módulos
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.mock_api import app
-from core.non_repudiation import (
+from core.api import app
+from core.api import (
     sign_transaction,
     verify_signature,
     generate_timestamp,
@@ -79,11 +79,14 @@ ITERACOES = [1, 2, 3]
 # ===========================================================================
 
 @pytest.fixture(autouse=True)
-def limpar_audit_log():
-    """Limpa o log de auditoria antes de cada teste para isolamento."""
+def setup_teardown():
+    """Isola as configurações globais antes de cada cenário de teste."""
+    from core.api import clear_replay_cache
     audit_log.clear()
+    clear_replay_cache()
     yield
     audit_log.clear()
+    clear_replay_cache()
 
 
 # ===========================================================================
@@ -513,10 +516,11 @@ class TestDN4LogAuditoria:
         Resultado esperado: verify_chain() retorna True após 3 transações.
         """
         # Inserir 3 transações
-        for _ in range(3):
+        for i in range(3):
+            payload = {**PAYLOAD_VALIDO, "teste_idx": i}
             client.post(
                 "/api/v1/auditar/nr",
-                json=PAYLOAD_VALIDO,
+                json=payload,
                 headers=HEADERS_VALIDOS
             )
 
@@ -534,10 +538,11 @@ class TestDN4LogAuditoria:
         Resultado esperado: entry[n].prev_hash == entry[n-1].entry_hash.
         """
         # Inserir 3 transações
-        for _ in range(3):
+        for i in range(3):
+            payload = {**PAYLOAD_VALIDO, "teste_idx": i}
             client.post(
                 "/api/v1/auditar/nr",
-                json=PAYLOAD_VALIDO,
+                json=payload,
                 headers=HEADERS_VALIDOS
             )
 
