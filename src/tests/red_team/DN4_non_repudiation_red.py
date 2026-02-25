@@ -1,22 +1,49 @@
 """
 RED TEAM - Testes Adversariais para DN4 (Nao-Repudio)
 Foco: explorar bypass de autenticacao, replay e exposicao indevida de trilha de auditoria.
+
+Execução:
+- Sem RED_TEAM_API_URL: usa TestClient (in-process). Com RED_TEAM_API_URL no .env: API real (R5 pulado).
+  Coloque RED_TEAM_API_URL=http://127.0.0.1:8000 no .env na raiz e rode: pytest src/tests/red_team/DN4_non_repudiation_red.py -v -s
 """
 
 import hashlib
+import os
 import sys
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+import requests
+from dotenv import load_dotenv
+
+_load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+load_dotenv(_load_env_path)
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.api import app
-from core.api import app, audit_log, verify_signature
+BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
+if BASE_URL:
+    class _RealAPIClient:
+        def post(self, path, json=None, headers=None, **kwargs):
+            return requests.post(
+                f"{BASE_URL}{path}",
+                json=json,
+                headers=headers or {},
+                timeout=kwargs.get("timeout", 30),
+            )
+        def get(self, path, headers=None, **kwargs):
+            return requests.get(
+                f"{BASE_URL}{path}",
+                headers=headers or {},
+                timeout=kwargs.get("timeout", 30),
+            )
+    client = _RealAPIClient()
+else:
+    from fastapi.testclient import TestClient
+    from core.api import app
+    client = TestClient(app)
 
-
-client = TestClient(app)
+from core.api import audit_log, verify_signature
 
 HEADERS_VALIDOS = {
     "account-key": "red-team-account",
@@ -37,7 +64,10 @@ PAYLOAD_BASE = {
 
 @pytest.fixture(autouse=True)
 def limpar_log():
-    """Isola cenarios que dependem da cadeia de hash e do cache de replay."""
+    """Isola cenarios que dependem da cadeia de hash e do cache de replay (apenas in-process)."""
+    if BASE_URL:
+        yield
+        return
     from core.api import clear_replay_cache
     audit_log.clear()
     clear_replay_cache()
@@ -106,6 +136,7 @@ class TestDN4RedTeam:
         assert response.status_code in [401, 403]
 
     # ========== DN4.R5: Chain Tampering Detection ==========
+    @pytest.mark.skipif(bool(os.environ.get("RED_TEAM_API_URL")), reason="Requer acesso in-process ao audit_log para adulterar cadeia")
     def test_alerta_dispara_quando_cadeia_e_adulterada(self):
         """Valida deteccao de adulteracao quando hash chain e comprometida."""
         client.post("/api/v1/auditar/nr", json=PAYLOAD_BASE, headers=HEADERS_VALIDOS)

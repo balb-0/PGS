@@ -2,17 +2,48 @@
 RED TEAM - Testes Adversariais para DN3 (Disponibilidade e Resiliência)
 Foco: Explorar limites de resiliência dos mecanismos de rate limiting,
 circuit breaker, idempotência e health check.
+
+Execução:
+- Sem RED_TEAM_API_URL: usa TestClient (in-process). Com RED_TEAM_API_URL no .env: API real (R2, R6, R8 pulados).
+  Coloque RED_TEAM_API_URL=http://127.0.0.1:8000 no .env na raiz e rode: pytest src/tests/red_team/DN3_availability_red.py -v -s
 """
 
+import os
 import sys
 import time
 import threading
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+import requests
+from dotenv import load_dotenv
+
+_load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+load_dotenv(_load_env_path)
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
+if BASE_URL:
+    class _RealAPIClient:
+        def post(self, path, json=None, headers=None, **kwargs):
+            return requests.post(
+                f"{BASE_URL}{path}",
+                json=json,
+                headers=headers or {},
+                timeout=kwargs.get("timeout", 30),
+            )
+        def get(self, path, headers=None, **kwargs):
+            return requests.get(
+                f"{BASE_URL}{path}",
+                headers=headers or {},
+                timeout=kwargs.get("timeout", 30),
+            )
+    client = _RealAPIClient()
+else:
+    from fastapi.testclient import TestClient
+    from core.api import app  # noqa: E402
+    client = TestClient(app)
 
 from core.api import app  # noqa: E402
 import core.api as mock_api_module  # noqa: E402
@@ -24,13 +55,13 @@ from core.api import (  # noqa: E402
     CircuitState,
 )
 
-
-client = TestClient(app)
 HEADERS = {"account-key": "red-team-target", "app-key": "attack-vector-dn3"}
 
 
 def reset_availability_state():
-    """Garante que cada teste começa com estado limpo dos singletons DN3."""
+    """Garante que cada teste começa com estado limpo dos singletons DN3 (apenas in-process)."""
+    if BASE_URL:
+        return
     rate_limiter.reset()
     circuit_breaker.reset()
     health_checker.reset()
@@ -42,7 +73,10 @@ def _speed_up_mock_api_sleep(monkeypatch: pytest.MonkeyPatch):
     """
     A mock API simula processamento com asyncio.sleep(random.uniform(0.1, 0.5)).
     Para manter o Red Team rápido/reprodutível, zeramos o delay por padrão.
+    Em modo API real, não aplicamos patch (servidor remoto).
     """
+    if BASE_URL:
+        return
     monkeypatch.setattr(mock_api_module.random, "uniform", lambda _a, _b: 0.0)
 
 
@@ -87,6 +121,7 @@ class TestDN3RedTeam:
         assert body["status"] in ("healthy", "degraded")
 
     # ========== DN3.R2: Circuit Breaker Race Condition ==========
+    @pytest.mark.skipif(bool(os.environ.get("RED_TEAM_API_URL")), reason="Requer acesso in-process ao circuit_breaker")
     def test_dn3_r2_circuit_breaker_race_condition(self):
         """
         Dispara múltiplas threads chamando success/failure em paralelo.
@@ -200,8 +235,9 @@ class TestDN3RedTeam:
         """
         reset_availability_state()
 
-        # Para simular pior caso, forçamos o delay máximo do mock durante este teste.
-        mock_api_module.random.uniform = lambda _a, _b: 0.5
+        # Para simular pior caso, forçamos o delay máximo do mock durante este teste (apenas in-process).
+        if not BASE_URL:
+            mock_api_module.random.uniform = lambda _a, _b: 0.5
 
         start = time.time()
 
@@ -234,6 +270,7 @@ class TestDN3RedTeam:
         assert total < 10 * 1.0
 
     # ========== DN3.R6: Rate Limit Memory Exhaustion ==========
+    @pytest.mark.skipif(bool(os.environ.get("RED_TEAM_API_URL")), reason="Requer acesso in-process ao rate_limiter para verificar _requests")
     def test_dn3_r6_rate_limit_memory_exhaustion(self):
         """
         Envia muitas account-keys com strings grandes para inflar o dicionário.
@@ -265,6 +302,7 @@ class TestDN3RedTeam:
         assert len(rate_limiter._requests) >= num_keys  # type: ignore[attr-defined]
 
     # ========== DN3.R8: Idempotency Store Unbounded Growth ==========
+    @pytest.mark.skipif(bool(os.environ.get("RED_TEAM_API_URL")), reason="Requer acesso in-process ao idempotency_store")
     def test_dn3_r8_idempotency_store_unbounded_growth(self):
         """
         Envia muitas chaves de idempotência únicas e verifica crescimento do store.
@@ -292,8 +330,9 @@ class TestDN3RedTeam:
             resp = client.post("/api/v1/auditar/resilient", json=payload, headers=headers)
             assert resp.status_code in (201, 400, 429, 503)
 
-        # O store deve refletir o número de chaves únicas enviadas (sem TTL/eviction)
-        assert idempotency_store.size() >= num_requests
+        # O store deve refletir o número de chaves únicas enviadas (sem TTL/eviction) — apenas in-process
+        if not BASE_URL:
+            assert idempotency_store.size() >= num_requests
 
 
 if __name__ == "__main__":
