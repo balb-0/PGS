@@ -12,10 +12,10 @@ from fastapi.testclient import TestClient
 import sys
 from pathlib import Path
 
-# Adicionar o caminho ao src para importar o mock_api
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Adicionar o caminho ao src para importar a api
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.mock_api import app
+from core.api import app
 
 # Cliente de teste para a API
 client = TestClient(app)
@@ -450,5 +450,5 @@ class TestDN2ContractValidation:
 
 
 if __name__ == "__main__":
-    # Executar testes com: pytest src/tests/test_mock_api.py -v
+    # Executar testes com: pytest src/tests/blue_team/validation.py -v
     pytest.main([__file__, "-v"])

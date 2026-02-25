@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.mock_api import app
-from core.non_repudiation import audit_log, verify_signature
+from core.api import app
+from core.api import app, audit_log, verify_signature
 
 
 client = TestClient(app)
@@ -37,10 +37,13 @@ PAYLOAD_BASE = {
 
 @pytest.fixture(autouse=True)
 def limpar_log():
-    """Isola cenarios que dependem da cadeia de hash."""
+    """Isola cenarios que dependem da cadeia de hash e do cache de replay."""
+    from core.api import clear_replay_cache
     audit_log.clear()
+    clear_replay_cache()
     yield
     audit_log.clear()
+    clear_replay_cache()
 
 
 class TestDN4RedTeam:

@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.mock_api import app
+from core.api import app
 
 client = TestClient(app)
 HEADERS = {"account-key": "red-team-target", "app-key": "attack-vector-01"}
