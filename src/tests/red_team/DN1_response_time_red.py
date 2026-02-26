@@ -1,19 +1,43 @@
 """
 RED TEAM - Testes Adversariais para DN1 (Tempo de Resposta / SLA)
 Foco: Tentar degradar a latência da API para quebrar o SLA que o Blue Team aferição valida.
+
+Execução:
+- Sem RED_TEAM_API_URL: usa TestClient (in-process). Com RED_TEAM_API_URL no .env: API real.
+  Coloque RED_TEAM_API_URL=http://127.0.0.1:8000 no .env na raiz e rode: pytest src/tests/red_team/DN1_response_time_red.py -v -s
 """
 
-import pytest
+import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from fastapi.testclient import TestClient
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from core.api import app
+import pytest
+import requests
+from dotenv import load_dotenv
 
-client = TestClient(app)
+_load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+load_dotenv(_load_env_path)
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
+if BASE_URL:
+    class _RealAPIClient:
+        def post(self, path, json=None, headers=None, **kwargs):
+            return requests.post(
+                f"{BASE_URL}{path}",
+                json=json,
+                headers=headers or {},
+                timeout=kwargs.get("timeout", 30),
+            )
+    client = _RealAPIClient()
+else:
+    from fastapi.testclient import TestClient
+    from core.api import app
+    client = TestClient(app)
+
 HEADERS = {"account-key": "red-team-target", "app-key": "attack-vector-01"}
 
 # Mesmos critérios do Blue Team (response_time.py) para atacar o mesmo SLA
@@ -177,7 +201,12 @@ class TestDN1RedTeamResponseTime:
         tempos_ms = []
 
         def worker(_id):
-            cli = TestClient(app)
+            if BASE_URL:
+                cli = client
+            else:
+                from fastapi.testclient import TestClient
+                from core.api import app
+                cli = TestClient(app)
             local_times = []
             for _ in range(requests_per_worker):
                 start = time.perf_counter()

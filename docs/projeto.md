@@ -23,7 +23,6 @@
 
 # Sumário
 
-
 - [Contextualização de BD/DN, análises de qualidade e decisões arquiteturais](#contextualização-de-bddn-análises-de-qualidade-e-decisões-arquiteturais)
   - [Business drivers extraídos do TAP (o que o parceiro espera)](#business-drivers-extraídos-do-tap-o-que-o-parceiro-espera)
   - [O que significa cada análise (como BD/DN viram evidência e arquitetura)](#o-que-significa-cada-análise-como-bddn-viram-evidência-e-arquitetura)
@@ -75,10 +74,12 @@
     - [Resultados Obtidos](#resultados-obtidos-4)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações)
     - [Execução](#execução)
+    - [Execução dos Testes (API real) — DN1](#execução-dos-testes-api-real--dn1)
   - [2.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão](#22-dn2-red-team---integridade-dos-dados-fiscais-na-ingestão)
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-1)
     - [Mapa de Direcionadores de Negócio - Red Team (DN2)](#mapa-de-direcionadores-de-negócio---red-team-dn2)
     - [Métodos de Testagem](#métodos-de-testagem)
+    - [Execução dos Testes (API real)](#execução-dos-testes-api-real-dn2)
     - [Análise dos Resultados (Logs de Execução)](#análise-dos-resultados-logs-de-execução)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-1)
     - [Argumentação e Ações Corretivas](#argumentação-e-ações-corretivas)
@@ -86,6 +87,7 @@
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-2)
     - [Mapa de Direcionadores de Negócio - Red Team (DN4)](#mapa-de-direcionadores-de-negócio---red-team-dn4)
     - [Métodos de Testagem](#métodos-de-testagem-1)
+    - [Execução dos Testes (API real) — DN4](#execução-dos-testes-api-real--dn4)
     - [Análise de Resultados](#análise-de-resultados)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-2)
     - [Ações Corretivas Recomendadas](#ações-corretivas-recomendadas)
@@ -93,6 +95,7 @@
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-3)
     - [Mapa de Direcionadores de Negócio - Red Team (DN3)](#mapa-de-direcionadores-de-negócio---red-team-dn3)
     - [Métodos de Testagem e Execução](#métodos-de-testagem-e-execução)
+    - [Execução dos Testes (API real) — DN3](#execução-dos-testes-api-real--dn3)
     - [Análise dos Resultados — Pontos Fortes](#análise-dos-resultados--pontos-fortes)
     - [Pontos de Quebra Identificados (FAIL)](#pontos-de-quebra-identificados-fail)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-3)
@@ -109,7 +112,7 @@
 
 Este projeto segue o direcionamento do TAP, cujo problema central, em um cenário **API First**, é garantir **cobertura de testes automatizada com qualidade e relevância** — isto é, não apenas “testar mais”, mas validar comportamento correto sob diferentes condições e reduzir risco em mudanças e deploys.
 
-Para atender esse objetivo, o documento organiza o trabalho em **Business Drivers (BD)** e **Direcionadores de Negócio (DN)**. Aqui, BD/DN são usados como uma ponte entre **risco/valor de negócio** e **evidência técnica** (testes, métricas, relatórios e decisões de arquitetura). Em outras palavras, cada análise descrita nas seções seguintes responde a duas perguntas: *qual risco do parceiro estamos reduzindo?* e *qual evidência entregamos para sustentar essa redução?*
+Para atender esse objetivo, o documento organiza o trabalho em **Business Drivers (BD)** e **Direcionadores de Negócio (DN)**. Aqui, BD/DN são usados como uma ponte entre **risco/valor de negócio** e **evidência técnica** (testes, métricas, relatórios e decisões de arquitetura). Em outras palavras, cada análise descrita nas seções seguintes responde a duas perguntas: _qual risco do parceiro estamos reduzindo?_ e _qual evidência entregamos para sustentar essa redução?_
 
 ### Business drivers extraídos do TAP (o que o parceiro espera)
 
@@ -124,14 +127,14 @@ Do TAP, derivam-se os principais drivers que orientam o recorte e a forma de ava
 
 Para garantir rastreabilidade entre expectativa e execução, as análises BD/DN apresentadas no documento são organizadas para cobrir esses drivers com evidências verificáveis:
 
-| Driver (TAP) | Como aparece nas análises (BD/DN) | Evidência gerada no documento |
-| --- | --- | --- |
-| Confiabilidade e estabilidade | Integridade de payload, disponibilidade/resiliência e não-repúdio | Casos de teste, critérios de aceite, resultados (pass/fail), limitações e recomendações |
-| Velocidade com confiança no deploy | Automação de testes orientada a dados (TDD) e execução repetível | Procedimentos de execução, suíte automatizada e resultados reprodutíveis |
-| Relevância da cobertura | Priorização por risco de negócio e contrato da API | Justificativa de escopo, mapeamento de “+” e “–”, riscos fora do foco e próximos passos |
-| Observabilidade e relatórios acionáveis | Métricas, SLAs, alertas e health checks | Métricas reportadas (ex.: conformidade), alertas/limiares e interpretação de impacto |
-| CI/CD e replicabilidade | Estrutura e disciplina de execução local/CLI visando pipeline | Organização do trabalho e instruções de execução compatíveis com esteira |
-| Qualidade/arquitetura/segurança | Avaliação de trade-offs arquiteturais sob risco | Decisões arquiteturais vinculadas a riscos e evidências de mitigação |
+| Driver (TAP)                            | Como aparece nas análises (BD/DN)                                 | Evidência gerada no documento                                                           |
+| --------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Confiabilidade e estabilidade           | Integridade de payload, disponibilidade/resiliência e não-repúdio | Casos de teste, critérios de aceite, resultados (pass/fail), limitações e recomendações |
+| Velocidade com confiança no deploy      | Automação de testes orientada a dados (TDD) e execução repetível  | Procedimentos de execução, suíte automatizada e resultados reprodutíveis                |
+| Relevância da cobertura                 | Priorização por risco de negócio e contrato da API                | Justificativa de escopo, mapeamento de “+” e “–”, riscos fora do foco e próximos passos |
+| Observabilidade e relatórios acionáveis | Métricas, SLAs, alertas e health checks                           | Métricas reportadas (ex.: conformidade), alertas/limiares e interpretação de impacto    |
+| CI/CD e replicabilidade                 | Estrutura e disciplina de execução local/CLI visando pipeline     | Organização do trabalho e instruções de execução compatíveis com esteira                |
+| Qualidade/arquitetura/segurança         | Avaliação de trade-offs arquiteturais sob risco                   | Decisões arquiteturais vinculadas a riscos e evidências de mitigação                    |
 
 ### O que significa cada análise (como BD/DN viram evidência e arquitetura)
 
@@ -326,7 +329,7 @@ pytest src/tests/blue_team/validation.py::TestDN2ContractValidation -v
 
 ### Decisão Arquitetural e Contexto de BD/DN
 
-&emsp;A validação rigorosa de payloads antes do processamento é uma decisão arquitetural derivada diretamente de um risco de negócio crítico: em um sistema de auditoria fiscal com **alto volume e intensidade de ingestão**, permitir que dados malformados avancem no pipeline consome recursos computacionais desnecessariamente e pode gerar resultados incorretos que comprometam a **precisão do atendimento** ao cliente. O padrão *fail-fast* (rejeitar antes de processar) foi adotado para proteger a integridade do fluxo fim a fim.
+&emsp;A validação rigorosa de payloads antes do processamento é uma decisão arquitetural derivada diretamente de um risco de negócio crítico: em um sistema de auditoria fiscal com **alto volume e intensidade de ingestão**, permitir que dados malformados avancem no pipeline consome recursos computacionais desnecessariamente e pode gerar resultados incorretos que comprometam a **precisão do atendimento** ao cliente. O padrão _fail-fast_ (rejeitar antes de processar) foi adotado para proteger a integridade do fluxo fim a fim.
 
 &emsp;A abordagem de validar **antes** de qualquer operação assíncrona (`await`) reflete uma escolha arquitetural consciente: garantir atomicidade e evitar que recursos de processamento, rastreio e armazenamento sejam alocados para dados que não atendem aos requisitos mínimos de negócio. Essa estratégia também cria uma base sólida para futuras camadas de **aprendizado de máquina**, já que modelos de detecção de anomalias ou classificação fiscal dependem de dados de entrada com integridade garantida.
 
@@ -886,6 +889,7 @@ pytest src/tests/blue_team/non_repudiation.py::TestDN4ContratoAPI -v
 - Cenários de carga mista (requisições válidas e inválidas simultaneamente) não foram explorados, embora representem o padrão real de tráfego em produção.
 
 **Priorização sugerida:**
+
 1. **Revalidar em ambiente com rede real e contenção de recursos** — essencial para confirmar se a resiliência observada se mantém fora do ambiente ideal.
 2. **Adicionar testes de carga sustentada** — complementar as rajadas com cenários de estresse prolongado para mapear comportamento ao longo do tempo.
 3. **Combinar cenários de DN1 com DN3** — testar latência sob condições onde rate limiting e circuit breaker estejam ativos simultaneamente.
@@ -899,6 +903,20 @@ make stress
 # Direto com pytest
 .venv/bin/python -m pytest src/tests/red_team/response_time_red.py -v -s
 ```
+
+### Execução dos Testes (API real) — DN1
+
+&emsp;Os testes de latência podem rodar contra a **API real**. A forma mais prática é usar um arquivo **.env** na raiz do projeto: defina `RED_TEAM_API_URL=http://127.0.0.1:8000` (ou a URL da sua API), suba a API em outro terminal e rode o pytest normalmente:
+
+```bash
+# Terminal 1 — subir a API (a partir de src/)
+uvicorn core.api:app --reload --port 8000
+
+# Terminal 2 — com .env configurado, basta:
+pytest src/tests/red_team/DN1_response_time_red.py -v -s
+```
+
+Sem `RED_TEAM_API_URL` no .env ou no shell, o script usa TestClient (in-process).
 
 ## 2.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão
 
@@ -922,8 +940,24 @@ make stress
 
 O teste foi conduzido utilizando o framework **pytest-9.0.2** em ambiente **Python 3.13.3**.
 
-- **Abordagem**: Foi utilizado o `FastAPI TestClient` para simular ataques de injeção de dados e poluição de schema.
+- **Abordagem**: Os testes podem rodar de duas formas: (1) com **TestClient** (in-process), típico para CI; (2) contra a **API real** (servidor HTTP em execução), definindo a variável de ambiente `RED_TEAM_API_URL`.
 - **Escopo**: Foco exclusivo na validação de entrada (Input Validation) antes da geração do `tracking_id` e do processamento assíncrono.
+
+### Execução dos Testes (API real) — DN2
+
+&emsp;Os testes adversariais de DN2 podem ser executados contra a **API real** (servidor já em execução), permitindo validar o comportamento em ambiente próximo ao de produção (rede, serialização HTTP, timeouts).
+
+**Forma recomendada:** usar **.env** na raiz do projeto. Defina `RED_TEAM_API_URL=http://127.0.0.1:8000` no arquivo `.env` na raíz do projeto. Suba a API em outro terminal e rode o pytest:
+
+```bash
+# Terminal 1 — a partir de src/
+uvicorn core.api:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — com .env configurado
+pytest src/tests/red_team/DN2_validation_red.py -v -s
+```
+
+Sem `RED_TEAM_API_URL` no .env ou no shell, o script usa o **TestClient** (in-process).
 
 ### Análise dos Resultados (Logs de Execução)
 
@@ -944,7 +978,7 @@ O teste de **Resiliência Numérica** falhou em três cenários específicos:
 
 ### Síntese de Impacto (Positivos x Negativos) e Priorizações
 
-&emsp;Do ponto de vista de BD/DN, os testes adversariais de integridade validam se as decisões arquiteturais de validação *fail-fast* resistem a entradas maliciosas e extremas que o Blue Team não exercita, e se o fluxo de auditoria preserva a **precisão de atendimento** sob condições adversariais.
+&emsp;Do ponto de vista de BD/DN, os testes adversariais de integridade validam se as decisões arquiteturais de validação _fail-fast_ resistem a entradas maliciosas e extremas que o Blue Team não exercita, e se o fluxo de auditoria preserva a **precisão de atendimento** sob condições adversariais.
 
 **Aspectos positivos (para além do foco imediato):**
 
@@ -993,9 +1027,18 @@ Para que este ativo de software evolua em alinhamento com os riscos de negócio 
 
 ### Métodos de Testagem
 
-- Script adversarial: `src/tests/red_team/non_repudiation_red.py`
-- Abordagem: `FastAPI TestClient` com simulação de atacante e intruso entre contas.
-- Escopo: endpoint `POST /api/v1/auditar/nr` e consultas `GET /api/v1/audit-log`.
+- Script adversarial: `src/tests/red_team/DN4_non_repudiation_red.py`
+- Abordagem: `FastAPI TestClient` (in-process) ou requisições HTTP contra a API real quando `RED_TEAM_API_URL` está definida.
+- Escopo: endpoint `POST /api/v1/auditar/nr` e consultas `GET /api/v1/audit-log`. O teste R5 (chain tampering) só roda in-process.
+
+### Execução dos Testes (API real) — DN4
+
+&emsp;Com **.env** configurado (`RED_TEAM_API_URL` em `.env.example`), suba a API e rode o pytest. O teste **DN4.R5** (adulteração da cadeia de hash) é pulado nesse modo por depender de estado interno do processo.
+
+```bash
+# Com .env na raiz (RED_TEAM_API_URL=http://127.0.0.1:8000)
+pytest src/tests/red_team/DN4_non_repudiation_red.py -v -s
+```
 
 ### Análise de Resultados
 
@@ -1042,73 +1085,82 @@ Para que este ativo de software evolua em alinhamento com os riscos de negócio 
 
 &emsp;Foram definidos cenários adversariais alinhados aos mecanismos de disponibilidade:
 
-| ID          | Direcionador Adversarial                         | Objetivo Técnico                                                                                      | Status   |
-| :---------- | :----------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :------- |
-| **DN3.R1**  | Rate Limit Bypass por Header Spoofing            | Tentar burlar o controle de taxa variando `account-key` em rajadas de alta intensidade.              | **PASS** |
-| **DN3.R2**  | Circuit Breaker Race Condition                   | Estressar o `CircuitBreaker` com chamadas concorrentes de sucesso/falha e validar consistência.      | **PASS** |
-| **DN3.R3**  | Idempotency Key Collision com Payload Diferente  | Enviar mesma `idempotency-key` com payloads distintos para validar sinalização correta de replay.    | **FAIL** |
-| **DN3.R4**  | Health Check Information Leakage                 | Verificar se o `GET /health` não vaza informações sensíveis de infraestrutura/stack interna.         | **PASS** |
-| **DN3.R5**  | Slowloris / Connection Exhaustion (simples)      | Simular requisições “lentas” para testar degradação controlada sem colapso nem cascata de erros.     | **PASS** |
-| **DN3.R6**  | Rate Limit Memory Exhaustion                     | Inflar o dicionário interno do rate limiter com chaves gigantes para medir risco de consumo de RAM. | **PASS** |
-| **DN3.R8**  | Idempotency Store Unbounded Growth               | Forçar muitas chaves de idempotência únicas e observar crescimento (ou não) do `IdempotencyStore`.  | **FAIL** |
+| ID         | Direcionador Adversarial                        | Objetivo Técnico                                                                                    | Status   |
+| :--------- | :---------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **DN3.R1** | Rate Limit Bypass por Header Spoofing           | Tentar burlar o controle de taxa variando `account-key` em rajadas de alta intensidade.             | **PASS** |
+| **DN3.R2** | Circuit Breaker Race Condition                  | Estressar o `CircuitBreaker` com chamadas concorrentes de sucesso/falha e validar consistência.     | **PASS** |
+| **DN3.R3** | Idempotency Key Collision com Payload Diferente | Enviar mesma `idempotency-key` com payloads distintos para validar sinalização correta de replay.   | **FAIL** |
+| **DN3.R4** | Health Check Information Leakage                | Verificar se o `GET /health` não vaza informações sensíveis de infraestrutura/stack interna.        | **PASS** |
+| **DN3.R5** | Slowloris / Connection Exhaustion (simples)     | Simular requisições “lentas” para testar degradação controlada sem colapso nem cascata de erros.    | **PASS** |
+| **DN3.R6** | Rate Limit Memory Exhaustion                    | Inflar o dicionário interno do rate limiter com chaves gigantes para medir risco de consumo de RAM. | **PASS** |
+| **DN3.R8** | Idempotency Store Unbounded Growth              | Forçar muitas chaves de idempotência únicas e observar crescimento (ou não) do `IdempotencyStore`.  | **FAIL** |
 
 ### Métodos de Testagem e Execução
 
-- **Script**: `src/tests/red_team/availability_red.py`  
-- **Ferramenta**: `pytest 8.4.2` em ambiente `Python 3.11.9` com `FastAPI TestClient`.  
+- **Script**: `src/tests/red_team/DN3_availability_red.py`
+- **Ferramenta**: `pytest` com `FastAPI TestClient` (in-process) ou requisições HTTP quando `RED_TEAM_API_URL` está definida.
+- Em modo API real, os testes **DN3.R2**, **DN3.R6** e **DN3.R8** são pulados (dependem de estado interno: circuit_breaker, rate_limiter, idempotency_store).
 - **Execução analisada** (`13/02/2026`): 7 itens coletados, com o seguinte resumo:
-  - **5 testes PASS**: DN3.R1, DN3.R2, DN3.R4, DN3.R5, DN3.R6  
-  - **2 testes FAIL**: DN3.R3, DN3.R8  
+  - **5 testes PASS**: DN3.R1, DN3.R2, DN3.R4, DN3.R5, DN3.R6
+  - **2 testes FAIL**: DN3.R3, DN3.R8
 
 &emsp;Do ponto de vista de BD/DN, a suíte cobre tanto **fluxos normais de alta intensidade** (rajadas, concorrência, payloads lentos) quanto **condições extremas de dados** (chaves gigantes, muitas chaves únicas), indo além do foco original do Blue Team para mapear riscos adicionais de saturação e inconsistências lógicas.
 
+### Execução dos Testes (API real) — DN3
+
+&emsp;Com a API em execução, os testes podem rodar contra a API real. Os cenários **R2** (circuit breaker race), **R6** (rate limit memory) e **R8** (idempotency store growth) são pulados nesse modo por dependerem de singletons in-process.
+
+```bash
+RED_TEAM_API_URL=http://127.0.0.1:8000 pytest src/tests/red_team/DN3_availability_red.py -v -s
+```
+
 ### Análise dos Resultados — Pontos Fortes
 
-- **Fluxos contínuos sob carga (DN3.R1, DN3.R5)**:  
-  - Mesmo com **rajadas de contas diferentes** e simulação de requisições lentas, a API manteve códigos de retorno dentro do conjunto esperado `(201, 400, 429, 503)` sem explodir em erros 5xx não tratados.  
+- **Fluxos contínuos sob carga (DN3.R1, DN3.R5)**:
+  - Mesmo com **rajadas de contas diferentes** e simulação de requisições lentas, a API manteve códigos de retorno dentro do conjunto esperado `(201, 400, 429, 503)` sem explodir em erros 5xx não tratados.
   - O endpoint de **health check** permaneceu responsivo, essencial para que camadas de orquestração e ML de roteamento/auto-scaling consigam reagir rapidamente ao estado do sistema.
 
-- **Consistência de estado do circuit breaker (DN3.R2)**:  
-  - A execução multithread confirmou que o contador de falhas nunca fica negativo e que o `CircuitState` se mantém em um dos estados válidos (`CLOSED`, `OPEN`, `HALF_OPEN`).  
+- **Consistência de estado do circuit breaker (DN3.R2)**:
+  - A execução multithread confirmou que o contador de falhas nunca fica negativo e que o `CircuitState` se mantém em um dos estados válidos (`CLOSED`, `OPEN`, `HALF_OPEN`).
   - Isso reforça uma **decisão arquitetural crítica de BD/DN**: proteger o backend fiscal de falhas em cascata sem entrar em estados “zumbis” que poderiam gerar decisões erradas em pipelines de auditoria automatizados.
 
-- **Observabilidade segura (DN3.R4)**:  
-  - O `GET /api/v1/health` retorna apenas o contrato público desenhado (status, uptime, métricas de erro, estado do circuito), **sem vazar stack trace, IP, paths ou dependências internas**.  
+- **Observabilidade segura (DN3.R4)**:
+  - O `GET /api/v1/health` retorna apenas o contrato público desenhado (status, uptime, métricas de erro, estado do circuito), **sem vazar stack trace, IP, paths ou dependências internas**.
   - Isso equilibra **precisão de atendimento** (dados suficientes para operação e monitoramento) com **segurança** (não expor informações sensíveis a atacantes).
 
-- **Detecção de riscos de consumo de memória (DN3.R6)**:  
-  - O teste confirma que o dicionário interno do `RateLimiter` cresce proporcionalmente ao número de chaves únicas, documentando um comportamento de **crescimento potencialmente ilimitado**.  
+- **Detecção de riscos de consumo de memória (DN3.R6)**:
+  - O teste confirma que o dicionário interno do `RateLimiter` cresce proporcionalmente ao número de chaves únicas, documentando um comportamento de **crescimento potencialmente ilimitado**.
   - Embora o teste passe, o resultado é usado como **evidência de risco de BD/DN**: em cenários reais de tráfego hostil, o consumo de memória pode comprometer a disponibilidade se não houver políticas de expiração/compactação.
 
 ### Pontos de Quebra Identificados (FAIL)
 
 **1. DN3.R3 — Idempotency Key Collision com Payload Diferente**
 
-- **Cenário**:  
-  - Duas requisições são enviadas para `POST /api/v1/auditar/resilient` com a **mesma `idempotency-key`** (`fixed-idempotency-key-r3`), mas com payloads diferentes (`modulo_dn3_r3_v1` vs. `modulo_dn3_r3_v2`).  
+- **Cenário**:
+  - Duas requisições são enviadas para `POST /api/v1/auditar/resilient` com a **mesma `idempotency-key`** (`fixed-idempotency-key-r3`), mas com payloads diferentes (`modulo_dn3_r3_v1` vs. `modulo_dn3_r3_v2`).
   - Espera-se, do ponto de vista de negócio, que a API:
-    1. **retorne o mesmo `tracking_id` e os mesmos detalhes** da primeira requisição (sem reprocessar), e  
+    1. **retorne o mesmo `tracking_id` e os mesmos detalhes** da primeira requisição (sem reprocessar), e
     2. **sinalize claramente que a segunda resposta é um replay**, via `availability.idempotent_replay = true`.
 
-- **Resultado observado na execução**:  
-  - Asserções de equivalência de `tracking_id`, `volume_processado` e `modulo` passaram, indicando que o **fluxo de idempotência básico funciona** (não há reprocessamento indevido).  
+- **Resultado observado na execução**:
+  - Asserções de equivalência de `tracking_id`, `volume_processado` e `modulo` passaram, indicando que o **fluxo de idempotência básico funciona** (não há reprocessamento indevido).
   - A falha ocorreu especificamente na expectativa de que:
     ```python
     data2["availability"]["idempotent_replay"] is True
     # valor retornado: False
     ```
 
-- **Leitura de BD/DN**:  
-  - O fluxo de processamento está correto (não duplica operação), mas a **sinalização de replay é imprecisa**.  
+- **Leitura de BD/DN**:
+  - O fluxo de processamento está correto (não duplica operação), mas a **sinalização de replay é imprecisa**.
   - Isso afeta diretamente a confiabilidade de **fluxos inteligentes** (retries, billing, antifraude, dashboards, modelos de ML) que dependem desta flag para diferenciar primeiras execuções de replays.
 
 **2. DN3.R8 — Idempotency Store Unbounded Growth**
 
-- **Cenário**:  
-  - O teste envia **centenas de requisições** para `POST /api/v1/auditar/resilient`, cada uma com uma `idempotency-key` única (`unique-idempo-{i}`), alternando `account-key` para não acionar o rate limit.  
+- **Cenário**:
+  - O teste envia **centenas de requisições** para `POST /api/v1/auditar/resilient`, cada uma com uma `idempotency-key` única (`unique-idempo-{i}`), alternando `account-key` para não acionar o rate limit.
   - A expectativa (e documentação) é que o `IdempotencyStore` cresça de forma **não limitada**, refletindo aproximadamente o número de chaves únicas enviadas.
 
-- **Resultado observado na execução**:  
+- **Resultado observado na execução**:
   - Na execução analisada, com `num_requests = 500`, o assert:
     ```python
     assert idempotency_store.size() >= num_requests
@@ -1116,27 +1168,27 @@ Para que este ativo de software evolua em alinhamento com os riscos de negócio 
     ```
     falhou, indicando que o store atingiu apenas **10 entradas**, muito abaixo do volume ingerido.
 
-- **Leitura de BD/DN**:  
-  - O comportamento real do `IdempotencyStore` **não corresponde à hipótese de crescimento ilimitado** usada na modelagem de risco.  
+- **Leitura de BD/DN**:
+  - O comportamento real do `IdempotencyStore` **não corresponde à hipótese de crescimento ilimitado** usada na modelagem de risco.
   - Há um trade-off importante:
-    - **Ponto positivo**: existe um “freio” implícito que evita explosão de memória por chaves infinitas, ajudando a preservar disponibilidade em cenários extremos.  
+    - **Ponto positivo**: existe um “freio” implícito que evita explosão de memória por chaves infinitas, ajudando a preservar disponibilidade em cenários extremos.
     - **Ponto negativo**: parte dos replays pode **não ser registrada**, reduzindo rastreabilidade, precisão analítica (incluindo ML) e transparência em auditorias de negócio.
 
 ### Síntese de Impacto (Positivos x Negativos) e Priorizações
 
 - **Aspectos Positivos (para além do foco imediato dos testes)**:
-  - A arquitetura de DN3 combina **fluxos bem definidos** (rate limit → circuit breaker → health → idempotência) que protegem o BD/DN de indisponibilidades catastróficas, mantendo a API operante mesmo sob abuso.  
-  - O desenho de métricas (`uptime`, `error_rate_percent`, `circuit_breaker`, contadores internos) cria base sólida para **painéis em tempo real e modelos de aprendizado de máquina**, capazes de detectar padrões de degradação e ajustar capacidade/políticas automaticamente.  
+  - A arquitetura de DN3 combina **fluxos bem definidos** (rate limit → circuit breaker → health → idempotência) que protegem o BD/DN de indisponibilidades catastróficas, mantendo a API operante mesmo sob abuso.
+  - O desenho de métricas (`uptime`, `error_rate_percent`, `circuit_breaker`, contadores internos) cria base sólida para **painéis em tempo real e modelos de aprendizado de máquina**, capazes de detectar padrões de degradação e ajustar capacidade/políticas automaticamente.
   - A separação entre **contrato público estável** e detalhes internos reforça segurança e governança de dados, sem sacrificar a precisão necessária para operação e monitoramento.
 
 - **Aspectos Negativos / Riscos Mapeados**:
-  - Inconsistência na sinalização de `idempotent_replay` (DN3.R3) reduz a confiabilidade de camadas externas que usam essa flag para decisões de negócio.  
-  - Divergência entre a premissa de crescimento ilimitado e o comportamento real do `IdempotencyStore` (DN3.R8) pode **mascarar replays** e dificultar análises retroativas.  
+  - Inconsistência na sinalização de `idempotent_replay` (DN3.R3) reduz a confiabilidade de camadas externas que usam essa flag para decisões de negócio.
+  - Divergência entre a premissa de crescimento ilimitado e o comportamento real do `IdempotencyStore` (DN3.R8) pode **mascarar replays** e dificultar análises retroativas.
   - O crescimento sem política explícita de TTL/eviction no `RateLimiter` continua sendo risco de longo prazo em ambientes com muitas contas.
 
 - **Priorização sugerida (considerando limitações de tempo/conhecimento)**:
-  1. **Corrigir rapidamente a sinalização de replay (DN3.R3)** — mudança pontual de contrato, com impacto direto na precisão de monitoramento e automações.  
-  2. **Rever o comportamento do `IdempotencyStore` (DN3.R8)** — alinhar implementação à estratégia de negócio: ou documentar o limite/eviction como decisão consciente, ou implementar de fato políticas de crescimento controlado (TTL, max-size, limpeza).  
+  1. **Corrigir rapidamente a sinalização de replay (DN3.R3)** — mudança pontual de contrato, com impacto direto na precisão de monitoramento e automações.
+  2. **Rever o comportamento do `IdempotencyStore` (DN3.R8)** — alinhar implementação à estratégia de negócio: ou documentar o limite/eviction como decisão consciente, ou implementar de fato políticas de crescimento controlado (TTL, max-size, limpeza).
   3. **Endereçar o risco de memória no rate limit** — definir políticas de expiração/compactação das chaves pouco usadas, preservando disponibilidade e escalabilidade.
 
 &emsp;Com isso, o Red Team mostra que, embora **5 de 7 cenários DN3 adversariais tenham passado**, ainda existem lacunas entre o **modelo de risco de BD/DN** e o **comportamento efetivo do software**, evidenciando as decisões arquiteturais tomadas e os próximos passos de priorização em função de tempo, conhecimento e risco de negócio.
