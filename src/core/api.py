@@ -38,7 +38,7 @@ async def asis_upload_file(account_key: str = ASIS_ACCOUNT_KEY, app_key: str = A
         'app-key': app_key
     }
 
-    
+
     if not os.path.exists(LOCAL_SPED_FILE):
         raise FileNotFoundError(f"Local file not found: {LOCAL_SPED_FILE}")
 
@@ -46,14 +46,14 @@ async def asis_upload_file(account_key: str = ASIS_ACCOUNT_KEY, app_key: str = A
     with open(LOCAL_SPED_FILE, 'rb') as f:
         # httpx format for file upload: {'file': (filename, content, content_type)}
         files = {'file': (os.path.basename(LOCAL_SPED_FILE), f, 'text/plain')}
-        
+
         # Faz a request usando `httpx` assíncrono global para liberar a threadpool
         response = await client.post(
             ASIS_UPLOAD_URL,
             headers=headers,
             files=files
         )
-        
+
         response.raise_for_status()
         data = response.json()
         if 'processos' in data and len(data['processos']) > 0:
@@ -656,6 +656,325 @@ def check_chain_alert(log: AuditLog) -> Optional[str]:
         return "ALERTA NÃO-REPÚDIO: Cadeia de hash do log de auditoria comprometida — possível adulteração detectada"
     return None
 
+# =============================================================================
+# RNF1 — Verificação de Não-Repúdio a partir de Reclamação de Cliente
+# Análise de Sazonalidade (valor, recorrência, data)
+# =============================================================================
+
+class TransactionHistoryStore:
+    """
+    Armazena o histórico de transações por ator (account-key hash) para
+    análise de sazonalidade. Cada entrada contém o payload, timestamp,
+    tracking_id e recibo digital.
+
+    Utilizado pelo RNF1 para verificar se uma transação contestada está
+    dentro dos padrões históricos do cliente (valor, recorrência, data).
+    """
+
+    def __init__(self):
+        self._history: Dict[str, List[Dict[str, Any]]] = {}
+        self._lock = threading.Lock()
+
+    def record(self, actor: str, transaction: Dict[str, Any]):
+        """Registra uma transação no histórico do ator."""
+        with self._lock:
+            if actor not in self._history:
+                self._history[actor] = []
+            self._history[actor].append(transaction)
+
+    def get_history(self, actor: str) -> List[Dict[str, Any]]:
+        """Retorna o histórico completo de um ator."""
+        with self._lock:
+            return list(self._history.get(actor, []))
+
+    def get_transaction_by_tracking_id(self, tracking_id: str) -> Optional[Dict[str, Any]]:
+        """Busca uma transação específica pelo tracking_id em todos os atores."""
+        with self._lock:
+            for actor_history in self._history.values():
+                for tx in actor_history:
+                    if tx.get("tracking_id") == tracking_id:
+                        return tx
+            return None
+
+    def size(self) -> int:
+        """Retorna o total de transações armazenadas."""
+        with self._lock:
+            return sum(len(v) for v in self._history.values())
+
+    def clear(self):
+        """Limpa todo o histórico (apenas para testes)."""
+        with self._lock:
+            self._history.clear()
+
+
+class SeasonalityAnalyzer:
+    """
+    Motor de análise de sazonalidade para verificação de não-repúdio.
+
+    Avalia se uma transação contestada está dentro dos padrões históricos
+    do cliente em três dimensões:
+    - Valor: se o valor está dentro do intervalo estatístico (média ± 2σ)
+    - Recorrência: se o cliente já realizou transações similares (mesmo destino)
+    - Data/Horário: se o horário da transação está dentro da janela habitual
+
+    RNF1: Testar o alerta não-repúdio a partir de reclamação de cliente por
+    transação alegada como não efetuada. Verificar se a transação está dentro
+    da sazonalidade de valor, recorrência e data.
+    """
+
+    # Limiares configuráveis
+    VALUE_DEVIATION_FACTOR = 2.0       # Fator de desvio padrão para valor
+    MIN_HISTORY_FOR_ANALYSIS = 2       # Mínimo de transações para análise estatística
+    HOUR_WINDOW_TOLERANCE = 4          # Tolerância em horas para janela habitual
+
+    @staticmethod
+    def analyze_value_seasonality(
+        history: List[Dict[str, Any]],
+        disputed_value: float
+    ) -> Dict[str, Any]:
+        """
+        RNF1.1 — Análise de Sazonalidade de Valor
+
+        Verifica se o valor da transação contestada está dentro do intervalo
+        estatístico do histórico do cliente (média ± 2σ).
+
+        Returns:
+            Dicionário com resultado da análise (within_pattern, mean, std_dev, etc.)
+        """
+        if len(history) < SeasonalityAnalyzer.MIN_HISTORY_FOR_ANALYSIS:
+            return {
+                "analysis": "INSUFICIENTE",
+                "reason": f"Histórico insuficiente ({len(history)} transações, mínimo {SeasonalityAnalyzer.MIN_HISTORY_FOR_ANALYSIS})",
+                "within_pattern": None,
+                "disputed_value": disputed_value,
+            }
+
+        values = [tx["payload"]["valor"] for tx in history if "payload" in tx and "valor" in tx["payload"]]
+
+        if not values:
+            return {
+                "analysis": "INSUFICIENTE",
+                "reason": "Nenhum valor encontrado no histórico",
+                "within_pattern": None,
+                "disputed_value": disputed_value,
+            }
+
+        mean_val = sum(values) / len(values)
+        variance = sum((v - mean_val) ** 2 for v in values) / len(values)
+        std_dev = variance ** 0.5
+
+        # Se desvio padrão é zero (todos os valores iguais), considerar uma margem de 10%
+        if std_dev == 0:
+            lower = mean_val * 0.9
+            upper = mean_val * 1.1
+        else:
+            lower = mean_val - (SeasonalityAnalyzer.VALUE_DEVIATION_FACTOR * std_dev)
+            upper = mean_val + (SeasonalityAnalyzer.VALUE_DEVIATION_FACTOR * std_dev)
+
+        within = lower <= disputed_value <= upper
+
+        return {
+            "analysis": "CONFORME" if within else "ANOMALO",
+            "within_pattern": within,
+            "disputed_value": disputed_value,
+            "historical_mean": round(mean_val, 2),
+            "historical_std_dev": round(std_dev, 2),
+            "acceptable_range": {"lower": round(lower, 2), "upper": round(upper, 2)},
+            "sample_size": len(values),
+        }
+
+    @staticmethod
+    def analyze_recurrence_seasonality(
+        history: List[Dict[str, Any]],
+        disputed_destination: str
+    ) -> Dict[str, Any]:
+        """
+        RNF1.2 — Análise de Sazonalidade de Recorrência
+
+        Verifica se o cliente já realizou transações para o mesmo destino
+        (módulo fiscal), indicando recorrência no padrão de uso.
+
+        Returns:
+            Dicionário com resultado da análise de recorrência.
+        """
+        destinations = [
+            tx["payload"]["destino"]
+            for tx in history
+            if "payload" in tx and "destino" in tx["payload"]
+        ]
+        total = len(destinations)
+        matches = sum(1 for d in destinations if d == disputed_destination)
+        frequency = (matches / total * 100) if total > 0 else 0.0
+
+        has_recurrence = matches > 0
+
+        return {
+            "analysis": "CONFORME" if has_recurrence else "ANOMALO",
+            "within_pattern": has_recurrence,
+            "disputed_destination": disputed_destination,
+            "historical_occurrences": matches,
+            "total_transactions": total,
+            "frequency_percent": round(frequency, 2),
+        }
+
+    @staticmethod
+    def analyze_temporal_seasonality(
+        history: List[Dict[str, Any]],
+        disputed_timestamp: str
+    ) -> Dict[str, Any]:
+        """
+        RNF1.3 — Análise de Sazonalidade Temporal (Data/Horário)
+
+        Verifica se o horário da transação contestada está dentro da janela
+        habitual de operação do cliente (baseada no histórico).
+
+        Returns:
+            Dicionário com resultado da análise temporal.
+        """
+        try:
+            disputed_dt = datetime.fromisoformat(disputed_timestamp)
+        except (ValueError, TypeError):
+            return {
+                "analysis": "ERRO",
+                "reason": "Timestamp da transação contestada inválido",
+                "within_pattern": None,
+                "disputed_timestamp": disputed_timestamp,
+            }
+
+        hours = []
+        for tx in history:
+            try:
+                ts = datetime.fromisoformat(tx.get("timestamp", ""))
+                hours.append(ts.hour)
+            except (ValueError, TypeError):
+                continue
+
+        if len(hours) < SeasonalityAnalyzer.MIN_HISTORY_FOR_ANALYSIS:
+            return {
+                "analysis": "INSUFICIENTE",
+                "reason": f"Histórico temporal insuficiente ({len(hours)} registros)",
+                "within_pattern": None,
+                "disputed_timestamp": disputed_timestamp,
+            }
+
+        mean_hour = sum(hours) / len(hours)
+        tolerance = SeasonalityAnalyzer.HOUR_WINDOW_TOLERANCE
+        lower_hour = mean_hour - tolerance
+        upper_hour = mean_hour + tolerance
+
+        disputed_hour = disputed_dt.hour
+        within = lower_hour <= disputed_hour <= upper_hour
+
+        return {
+            "analysis": "CONFORME" if within else "ANOMALO",
+            "within_pattern": within,
+            "disputed_hour": disputed_hour,
+            "historical_mean_hour": round(mean_hour, 1),
+            "acceptable_window": {
+                "lower_hour": round(max(0, lower_hour), 1),
+                "upper_hour": round(min(23, upper_hour), 1),
+            },
+            "sample_size": len(hours),
+            "disputed_timestamp": disputed_timestamp,
+        }
+
+    @staticmethod
+    def generate_dispute_verdict(
+        value_analysis: Dict[str, Any],
+        recurrence_analysis: Dict[str, Any],
+        temporal_analysis: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        RNF1.4 — Veredito Consolidado da Disputa
+
+        Combina as três análises de sazonalidade para emitir um veredito
+        sobre a transação contestada:
+        - TRANSAÇÃO LEGÍTIMA: todas as análises confirmam padrão normal
+        - ALERTA NÃO-REPÚDIO: pelo menos uma anomalia detectada
+        - INCONCLUSIVO: dados insuficientes para análise
+
+        Returns:
+            Dicionário com veredito, justificativa e nível de confiança.
+        """
+        analyses = [value_analysis, recurrence_analysis, temporal_analysis]
+        patterns = [a.get("within_pattern") for a in analyses]
+
+        anomalies = [a for a in analyses if a.get("analysis") == "ANOMALO"]
+        conformes = [a for a in analyses if a.get("analysis") == "CONFORME"]
+        insuficientes = [a for a in analyses if a.get("analysis") in ("INSUFICIENTE", "ERRO")]
+
+        if len(insuficientes) == 3:
+            return {
+                "verdict": "INCONCLUSIVO",
+                "confidence": "BAIXA",
+                "reason": "Dados históricos insuficientes para todas as dimensões de análise",
+                "anomalies_detected": 0,
+                "conformities_detected": 0,
+                "insufficient_data": 3,
+                "alert": "ALERTA NÃO-REPÚDIO: Análise inconclusiva — dados insuficientes para verificação de sazonalidade",
+            }
+
+        if len(anomalies) == 0 and len(conformes) > 0:
+            return {
+                "verdict": "TRANSAÇÃO LEGÍTIMA",
+                "confidence": "ALTA" if len(conformes) == 3 else "MÉDIA",
+                "reason": f"Transação dentro do padrão histórico em {len(conformes)}/3 dimensões analisadas",
+                "anomalies_detected": 0,
+                "conformities_detected": len(conformes),
+                "insufficient_data": len(insuficientes),
+                "alert": None,
+            }
+
+        # Pelo menos uma anomalia detectada
+        anomaly_dimensions = []
+        if value_analysis.get("analysis") == "ANOMALO":
+            anomaly_dimensions.append("VALOR")
+        if recurrence_analysis.get("analysis") == "ANOMALO":
+            anomaly_dimensions.append("RECORRÊNCIA")
+        if temporal_analysis.get("analysis") == "ANOMALO":
+            anomaly_dimensions.append("HORÁRIO")
+
+        confidence = "ALTA" if len(anomalies) >= 2 else "MÉDIA"
+
+        return {
+            "verdict": "ALERTA NÃO-REPÚDIO",
+            "confidence": confidence,
+            "reason": f"Anomalia detectada em {len(anomalies)} dimensão(ões): {', '.join(anomaly_dimensions)}",
+            "anomalies_detected": len(anomalies),
+            "conformities_detected": len(conformes),
+            "insufficient_data": len(insuficientes),
+            "alert": f"ALERTA NÃO-REPÚDIO: Transação contestada apresenta anomalia em: {', '.join(anomaly_dimensions)}",
+        }
+
+
+def check_dispute_alert(verdict: Dict[str, Any]) -> Optional[str]:
+    """
+    RNF1.5 — Emissão de Alerta de Não-Repúdio para Disputa
+
+    Emite alerta formatado quando a análise de sazonalidade indica anomalias
+    ou quando os dados são insuficientes para conclusão.
+
+    Args:
+        verdict: Resultado do generate_dispute_verdict().
+
+    Returns:
+        Mensagem de alerta se houver anomalia ou inconclusividade, None se legítima.
+    """
+    if verdict.get("verdict") == "TRANSAÇÃO LEGÍTIMA":
+        return None
+
+    if verdict.get("verdict") == "INCONCLUSIVO":
+        return "ALERTA NÃO-REPÚDIO: Análise de sazonalidade inconclusiva — requer investigação manual"
+
+    return verdict.get("alert", "ALERTA NÃO-REPÚDIO: Anomalia detectada na análise de sazonalidade")
+
+
+# Instância global do histórico de transações
+transaction_history = TransactionHistoryStore()
+
+# Instância global do analisador de sazonalidade (stateless, usa métodos estáticos)
+seasonality_analyzer = SeasonalityAnalyzer()
+
 app = FastAPI(title="API_G6 - ASIS TaxTech (Unified Proxy & Mock Fallback)", version="2.0.0")
 
 # =============================================================================
@@ -674,7 +993,7 @@ async def upload_multipart_proxy(
         files = {'file': (file.filename, content, file.content_type)}
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(
-            None, 
+            None,
             lambda: requests.post(ASIS_UPLOAD_URL, headers={'account-key': account_key, 'app-key': app_key}, files=files, timeout=10.0)
         )
         r.raise_for_status()
@@ -837,12 +1156,12 @@ async def processar_auditoria(
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
 
     # DN2.5: Apenas após validação completa, iniciar processamento assíncrono
-    
+
     # ATTEMPT REAL ASIS API COMUNICATON FIRST
     try:
         # Chama a versão sincrona num executor para não bloquear o loop
         real_process_id = await asis_upload_file(account_key, app_key)
-        
+
         return {
             "id": real_process_id,
             "status": 201,
@@ -856,7 +1175,7 @@ async def processar_auditoria(
                 "asis_process_id": real_process_id
             }
         }
-        
+
     except Exception as e:
         # FALLBACK PARA O MOCK
         print(f"[FALLBACK] Erro na API real: {str(e)}")
@@ -958,21 +1277,21 @@ async def processar_auditoria_resiliente(
     try:
         try:
             real_process_id = await asis_upload_file(account_key, app_key)
-            
+
             # Registrar sucesso no rastreamento de disponibilidade (DN3)
             circuit_breaker.record_success()
             health_checker.record_request(success=True)
-            
+
             tracking_id = str(real_process_id)
             transaction_id = real_process_id
             diagnostico = "Conforme (Real API ASIS)"
         except Exception as e:
             print(f"[FALLBACK] Erro na API real (Resilient): {str(e)}")
-            
+
             # Registrar falha para abrir o circuit breaker caso exceda a tolerância (DN3)
             circuit_breaker.record_failure()
             health_checker.record_request(success=False)
-            
+
             await asyncio.sleep(random.uniform(0.01, 0.1))
             tracking_id = str(uuid.uuid4())
             transaction_id = random.randint(20000, 30000)
@@ -1057,21 +1376,21 @@ async def processar_auditoria_nr(
     # Usaremos um hash do payload + account_key para identificar transações repetidas
     # num curto espaço de tempo.
     replay_token = hashlib.sha256((account_key + json.dumps(payload, sort_keys=True)).encode("utf-8")).hexdigest()
-    
+
     with _replay_lock:
         now = time.time()
         # Limpar o cache de transações antigas
         to_del = [k for k, v in _replay_cache.items() if now - v > REPLAY_WINDOW_SECONDS]
         for k in to_del:
             del _replay_cache[k]
-            
+
         if replay_token in _replay_cache:
             raise HTTPException(status_code=409, detail="ALERTA NÃO-REPÚDIO: Transação duplicada detectada (Replay Attack)")
         _replay_cache[replay_token] = now
 
     # --- Requisito DN4: A account_key DEVE ser estritamente validada (mock) ---
-    # Aqui simulamos que APENAS usuários com "red-team-account" ou chaves legítimas 
-    # conhecidas poderiam assinar por eles mesmos. 
+    # Aqui simulamos que APENAS usuários com "red-team-account" ou chaves legítimas
+    # conhecidas poderiam assinar por eles mesmos.
     # Em um cenário real, consultaríamos um serviço de Autenticação forte.
     if account_key == "intruso-sem-vinculo" or account_key == "conta-vip-cliente-asis":
         # Se forçarmos impersonation:
@@ -1109,6 +1428,17 @@ async def processar_auditoria_nr(
     # --- DN4.5: Registro no log de auditoria com cadeia de hash ---
     log_entry = audit_log.append(receipt)
 
+    # --- RNF1: Registrar transação no histórico para análise de sazonalidade ---
+    transaction_record = {
+        "tracking_id": tracking_id,
+        "payload": payload,
+        "timestamp": timestamp,
+        "actor": actor,
+        "receipt": receipt,
+        "log_position": log_entry["position"],
+    }
+    transaction_history.record(actor, transaction_record)
+
     return {
         "id": transaction_id,
         "status": 201,
@@ -1131,6 +1461,162 @@ async def processar_auditoria_nr(
             "alert": alert,
             "chain_alert": chain_alert
         }
+    }
+
+
+# =============================================================================
+# RNF1 — Endpoint de Disputa / Reclamação de Cliente (Não-Repúdio)
+# =============================================================================
+
+@app.post("/api/v1/disputa/nr", status_code=200)
+async def processar_disputa_nr(
+    account_key: str = Header(...),
+    app_key: str = Header(...),
+    payload: Dict[str, Any] = Body(...)
+):
+    """
+    RNF1 - Verificação de Não-Repúdio a partir de Reclamação de Cliente
+
+    Endpoint que recebe uma reclamação de cliente sobre uma transação alegada
+    como não efetuada. O sistema realiza análise de sazonalidade em três
+    dimensões (valor, recorrência, data) para verificar se a transação
+    contestada está dentro dos padrões históricos do cliente.
+
+    Payload esperado:
+    {
+        "tracking_id": "uuid da transação contestada",
+        "motivo": "Transação não reconhecida pelo cliente",
+        "data_reclamacao": "2026-02-13T10:00:00+00:00"  (opcional)
+    }
+
+    A resposta inclui:
+    - Dados da transação original (se encontrada no log)
+    - Análise de sazonalidade (valor, recorrência, data)
+    - Veredito consolidado (LEGÍTIMA / ALERTA / INCONCLUSIVO)
+    - Alerta de não-repúdio (se aplicável)
+    """
+    tracking_id = payload.get("tracking_id")
+    motivo = payload.get("motivo")
+
+    if not tracking_id:
+        raise HTTPException(status_code=400, detail="Campo 'tracking_id' obrigatório para disputa")
+
+    if not motivo:
+        raise HTTPException(status_code=400, detail="Campo 'motivo' obrigatório para disputa")
+
+    # --- Buscar transação contestada no histórico ---
+    disputed_tx = transaction_history.get_transaction_by_tracking_id(tracking_id)
+
+    if disputed_tx is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Transação com tracking_id '{tracking_id}' não encontrada no histórico"
+        )
+
+    # --- Identificar o ator da transação contestada ---
+    disputed_actor = disputed_tx.get("actor")
+    if not disputed_actor:
+        raise HTTPException(
+            status_code=500,
+            detail="Transação encontrada mas sem ator vinculado — falha de integridade"
+        )
+
+    # --- Verificar se o reclamante é o próprio ator (ou autorizado) ---
+    reclamante_actor = hash_actor(account_key)
+
+    # --- Obter histórico do ator da transação contestada ---
+    actor_history = transaction_history.get_history(disputed_actor)
+
+    # --- Extrair dados da transação contestada ---
+    disputed_payload = disputed_tx.get("payload", {})
+    disputed_value = disputed_payload.get("valor", 0)
+    disputed_destination = disputed_payload.get("destino", "")
+    disputed_timestamp = disputed_tx.get("timestamp", "")
+
+    # --- RNF1.1: Análise de Sazonalidade de Valor ---
+    value_analysis = SeasonalityAnalyzer.analyze_value_seasonality(
+        actor_history, disputed_value
+    )
+
+    # --- RNF1.2: Análise de Sazonalidade de Recorrência ---
+    recurrence_analysis = SeasonalityAnalyzer.analyze_recurrence_seasonality(
+        actor_history, disputed_destination
+    )
+
+    # --- RNF1.3: Análise de Sazonalidade Temporal ---
+    temporal_analysis = SeasonalityAnalyzer.analyze_temporal_seasonality(
+        actor_history, disputed_timestamp
+    )
+
+    # --- RNF1.4: Veredito Consolidado ---
+    verdict = SeasonalityAnalyzer.generate_dispute_verdict(
+        value_analysis, recurrence_analysis, temporal_analysis
+    )
+
+    # --- RNF1.5: Emissão de Alerta ---
+    dispute_alert = check_dispute_alert(verdict)
+
+    # --- Verificar integridade do recibo original ---
+    original_receipt = disputed_tx.get("receipt")
+    receipt_alert = check_alert(original_receipt)
+
+    # --- Timestamp da análise ---
+    analysis_timestamp = generate_timestamp()
+
+    return {
+        "disputa": {
+            "tracking_id": tracking_id,
+            "motivo": motivo,
+            "data_reclamacao": payload.get("data_reclamacao", analysis_timestamp),
+            "reclamante_actor": reclamante_actor,
+            "transacao_actor": disputed_actor,
+            "same_actor": reclamante_actor == disputed_actor,
+        },
+        "transacao_original": {
+            "tracking_id": disputed_tx.get("tracking_id"),
+            "timestamp": disputed_timestamp,
+            "payload": disputed_payload,
+            "receipt_integrity": receipt_alert is None,
+            "receipt_alert": receipt_alert,
+        },
+        "seasonality_analysis": {
+            "value": value_analysis,
+            "recurrence": recurrence_analysis,
+            "temporal": temporal_analysis,
+        },
+        "verdict": verdict,
+        "alert": dispute_alert,
+        "analysis_timestamp": analysis_timestamp,
+    }
+
+
+@app.get("/api/v1/historico/{actor_hash}", status_code=200)
+async def get_transaction_history(
+    actor_hash: str = Path(...),
+    account_key: str = Header(...),
+    app_key: str = Header(...),
+):
+    """
+    RNF1 - Consulta do Histórico de Transações de um Ator
+
+    Retorna o histórico de transações para análise de sazonalidade.
+    O actor_hash é o SHA-256 da account-key do ator.
+    """
+    requester_actor = hash_actor(account_key)
+
+    # Controle de acesso: apenas o próprio ator pode consultar seu histórico
+    if requester_actor != actor_hash:
+        raise HTTPException(
+            status_code=403,
+            detail="ALERTA NÃO-REPÚDIO: Acesso não autorizado ao histórico de transações de outro ator"
+        )
+
+    history = transaction_history.get_history(actor_hash)
+
+    return {
+        "actor": actor_hash,
+        "total_transactions": len(history),
+        "transactions": history,
     }
 
 
