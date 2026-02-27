@@ -419,7 +419,7 @@ class TestDN2ContractValidation:
         # Requisição sem headers
         response = client.post("/api/v1/auditar", json=payload)
         
-        assert response.status_code == 422  # Validation Error (FastAPI default)
+        assert response.status_code == 401  # RNF2: credenciais ausentes
     
     def test_estrutura_resposta_completa(self):
         """Validar que a estrutura de resposta contém todos os campos esperados."""

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path
+from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path, Depends
 from typing import Dict, Any, List, Optional
 import uuid
 import asyncio
@@ -23,6 +23,43 @@ def get_http_client() -> httpx.AsyncClient:
 # Credenciais de Conexão ASIS
 ASIS_APP_KEY = "D68C6DA8D520CDF6FBE48D36FB2634691B926F981FC5B755D09F8E8623EE37F2"
 ASIS_ACCOUNT_KEY = "94426c03635f18fcfb5060ee2f38f5e01c26a6c6c13f1978b732e65cbc0bfb0c"
+
+# RNF2 - registro de credenciais validas (account-key, app-key)
+# Para ambiente real, esse registro deve vir de um cofre/servico de identidade.
+VALID_CREDENTIAL_PAIRS = {
+    (ASIS_ACCOUNT_KEY, ASIS_APP_KEY),
+    ("conta-teste-123", "app-teste-456"),
+    ("conta-dn3-teste-123", "app-dn3-teste-456"),
+    ("conta-nr-teste-123", "app-nr-teste-456"),
+    ("conta-rnf1-teste-456", "app-rnf1-teste-789"),
+    ("conta-terceiro-xyz", "app-rnf1-teste-789"),
+    ("outra-conta-xyz-789", "app-nr-teste-456"),
+    ("4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e", "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb"),
+    ("tenant-alpha-account", "tenant-alpha-app"),
+    ("tenant-beta-account", "tenant-beta-app"),
+    ("red-team-account", "red-team-app"),
+    ("red-team-target", "attack-vector-01"),
+    ("red-team-target", "attack-vector-dn3"),
+}
+
+
+def authenticate_request(
+    account_key: Optional[str] = Header(default=None),
+    app_key: Optional[str] = Header(default=None),
+) -> Dict[str, str]:
+    """
+    RNF2 - Valida autenticidade das credenciais de acesso.
+
+    - 401 quando headers de autenticacao estao ausentes.
+    - 403 quando o par (account-key, app-key) nao esta registrado.
+    """
+    if not account_key or not app_key:
+        raise HTTPException(status_code=401, detail="Credenciais de autenticação ausentes")
+
+    if (account_key, app_key) not in VALID_CREDENTIAL_PAIRS:
+        raise HTTPException(status_code=403, detail="Credenciais inválidas")
+
+    return {"account_key": account_key, "app_key": app_key}
 
 # Local example file used for the proxied requests
 LOCAL_SPED_FILE = r"C:\Users\Inteli\g06\sped_exemplo.txt"
@@ -983,8 +1020,7 @@ app = FastAPI(title="API_G6 - ASIS TaxTech (Unified Proxy & Mock Fallback)", ver
 
 @app.post("/api/v1/upload", status_code=200)
 async def upload_multipart_proxy(
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
     file: UploadFile = File(...)
 ):
     """Proxy para o endpoint de Upload (Multipart). O Fallback gera IDs locais."""
@@ -994,7 +1030,15 @@ async def upload_multipart_proxy(
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(
             None,
-            lambda: requests.post(ASIS_UPLOAD_URL, headers={'account-key': account_key, 'app-key': app_key}, files=files, timeout=10.0)
+            lambda: requests.post(
+                ASIS_UPLOAD_URL,
+                headers={
+                    'account-key': auth['account_key'],
+                    'app-key': auth['app_key'],
+                },
+                files=files,
+                timeout=10.0,
+            )
         )
         r.raise_for_status()
         data = r.json()
@@ -1016,8 +1060,7 @@ async def upload_multipart_proxy(
 
 @app.post("/api/v1/upload/base64", status_code=200)
 async def upload_base64_proxy(
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
     payload: Dict[str, Any] = Body(...)
 ):
     """Proxy para o endpoint de Upload Base64."""
@@ -1025,7 +1068,16 @@ async def upload_base64_proxy(
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(
             None,
-            lambda: requests.post(f"{ASIS_UPLOAD_URL}/base64", headers={'account-key': account_key, 'app-key': app_key, 'Content-Type': 'application/json'}, json=payload, timeout=10.0)
+            lambda: requests.post(
+                f"{ASIS_UPLOAD_URL}/base64",
+                headers={
+                    'account-key': auth['account_key'],
+                    'app-key': auth['app_key'],
+                    'Content-Type': 'application/json',
+                },
+                json=payload,
+                timeout=10.0,
+            )
         )
         r.raise_for_status()
         data = r.json()
@@ -1047,15 +1099,21 @@ async def upload_base64_proxy(
 @app.get("/api/v1/processo/{process_id}", status_code=200)
 async def get_processo_status_proxy(
     process_id: int,
-    account_key: str = Header(...),
-    app_key: str = Header(...)
+    auth: Dict[str, str] = Depends(authenticate_request)
 ):
     """Proxy para consultar o status de processo ASIS."""
     try:
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(
             None,
-            lambda: requests.get(f"{ASIS_STATUS_URL}{process_id}", headers={'account-key': account_key, 'app-key': app_key}, timeout=5.0)
+            lambda: requests.get(
+                f"{ASIS_STATUS_URL}{process_id}",
+                headers={
+                    'account-key': auth['account_key'],
+                    'app-key': auth['app_key'],
+                },
+                timeout=5.0,
+            )
         )
         r.raise_for_status()
         data = r.json()
@@ -1075,15 +1133,21 @@ async def get_processo_status_proxy(
 @app.get("/api/v1/resultado/processo/{process_id}", status_code=200)
 async def get_resultado_proxy(
     process_id: int,
-    account_key: str = Header(...),
-    app_key: str = Header(...)
+    auth: Dict[str, str] = Depends(authenticate_request)
 ):
     """Proxy para extracao de resultados (paginado)."""
     try:
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(
             None,
-            lambda: requests.get(f"https://resultado.stg.asistaxtech.com.br/api/v1/resultado/processo/{process_id}", headers={'account-key': account_key, 'app-key': app_key}, timeout=5.0)
+            lambda: requests.get(
+                f"https://resultado.stg.asistaxtech.com.br/api/v1/resultado/processo/{process_id}",
+                headers={
+                    'account-key': auth['account_key'],
+                    'app-key': auth['app_key'],
+                },
+                timeout=5.0,
+            )
         )
         r.raise_for_status()
         data = r.json()
@@ -1100,15 +1164,21 @@ async def get_resultado_proxy(
 async def get_auditoria_resultado_proxy(
     process_id: int,
     auditoria_id: int,
-    account_key: str = Header(...),
-    app_key: str = Header(...)
+    auth: Dict[str, str] = Depends(authenticate_request)
 ):
     """Proxy para extracao do relatorio base da auditoria."""
     try:
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(
             None,
-            lambda: requests.get(f"https://resultado.stg.asistaxtech.com.br/api/v1/resultado/processo/{process_id}/auditoria/{auditoria_id}", headers={'account-key': account_key, 'app-key': app_key}, timeout=5.0)
+            lambda: requests.get(
+                f"https://resultado.stg.asistaxtech.com.br/api/v1/resultado/processo/{process_id}/auditoria/{auditoria_id}",
+                headers={
+                    'account-key': auth['account_key'],
+                    'app-key': auth['app_key'],
+                },
+                timeout=5.0,
+            )
         )
         r.raise_for_status()
         data = r.json()
@@ -1126,8 +1196,7 @@ async def get_auditoria_resultado_proxy(
 
 @app.post("/api/v1/auditar", status_code=201)
 async def processar_auditoria(
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
     payload: Dict[str, Any] = Body(...)
 ):
     """
@@ -1160,7 +1229,7 @@ async def processar_auditoria(
     # ATTEMPT REAL ASIS API COMUNICATON FIRST
     try:
         # Chama a versão sincrona num executor para não bloquear o loop
-        real_process_id = await asis_upload_file(account_key, app_key)
+        real_process_id = await asis_upload_file(auth["account_key"], auth["app_key"])
 
         return {
             "id": real_process_id,
@@ -1218,8 +1287,7 @@ async def health_check():
 
 @app.post("/api/v1/auditar/resilient", status_code=201)
 async def processar_auditoria_resiliente(
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
     idempotency_key: str = Header(None),
     payload: Dict[str, Any] = Body(...)
 ):
@@ -1230,6 +1298,9 @@ async def processar_auditoria_resiliente(
     graciosa sobre o processamento de auditoria fiscal.
     """
     # DN3.1: Rate Limiting
+    account_key = auth["account_key"]
+    app_key = auth["app_key"]
+
     if not rate_limiter.is_allowed(account_key):
         health_checker.record_request(success=False)
         raise HTTPException(
@@ -1342,8 +1413,7 @@ async def processar_auditoria_resiliente(
 
 @app.post("/api/v1/auditar/nr", status_code=201)
 async def processar_auditoria_nr(
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
     payload: Dict[str, Any] = Body(...)
 ):
     """
@@ -1368,6 +1438,9 @@ async def processar_auditoria_nr(
 
     if not isinstance(volume_docs, (int, float)) or math.isnan(volume_docs) or math.isinf(volume_docs) or volume_docs <= 0 or volume_docs > 1e100:
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
+
+    account_key = auth["account_key"]
+    app_key = auth["app_key"]
 
     # --- DN4.2: Carimbo temporal imutável (server-side) ---
     timestamp = generate_timestamp()
@@ -1470,8 +1543,7 @@ async def processar_auditoria_nr(
 
 @app.post("/api/v1/disputa/nr", status_code=200)
 async def processar_disputa_nr(
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
     payload: Dict[str, Any] = Body(...)
 ):
     """
@@ -1522,7 +1594,7 @@ async def processar_disputa_nr(
         )
 
     # --- Verificar se o reclamante é o próprio ator (ou autorizado) ---
-    reclamante_actor = hash_actor(account_key)
+    reclamante_actor = hash_actor(auth["account_key"])
 
     # --- Obter histórico do ator da transação contestada ---
     actor_history = transaction_history.get_history(disputed_actor)
@@ -1593,8 +1665,7 @@ async def processar_disputa_nr(
 @app.get("/api/v1/historico/{actor_hash}", status_code=200)
 async def get_transaction_history(
     actor_hash: str = Path(...),
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
 ):
     """
     RNF1 - Consulta do Histórico de Transações de um Ator
@@ -1602,7 +1673,7 @@ async def get_transaction_history(
     Retorna o histórico de transações para análise de sazonalidade.
     O actor_hash é o SHA-256 da account-key do ator.
     """
-    requester_actor = hash_actor(account_key)
+    requester_actor = hash_actor(auth["account_key"])
 
     # Controle de acesso: apenas o próprio ator pode consultar seu histórico
     if requester_actor != actor_hash:
@@ -1622,8 +1693,7 @@ async def get_transaction_history(
 
 @app.get("/api/v1/audit-log", status_code=200)
 async def get_audit_log(
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
 ):
     """
     DN4.5 - Consulta do Log de Auditoria
@@ -1631,7 +1701,7 @@ async def get_audit_log(
     Retorna o log completo de auditoria e o status de integridade da cadeia de hash.
     """
     # Apenas para fins de simulação de tenant isolation no DN4 R4:
-    if account_key == "intruso-sem-vinculo":
+    if auth["account_key"] == "intruso-sem-vinculo":
          raise HTTPException(status_code=403, detail="ALERTA NÃO-REPÚDIO: Acesso não autorizado ao log de auditoria desta conta")
 
     chain_valid = audit_log.verify_chain()
@@ -1648,8 +1718,7 @@ async def get_audit_log(
 @app.get("/api/v1/audit-log/{position}", status_code=200)
 async def get_audit_log_entry(
     position: int,
-    account_key: str = Header(...),
-    app_key: str = Header(...),
+    auth: Dict[str, str] = Depends(authenticate_request),
 ):
     """
     DN4.5 - Consulta de Entrada Específica do Log de Auditoria

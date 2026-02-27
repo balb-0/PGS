@@ -706,7 +706,7 @@ class TestRNF1ContratoEndpoint:
             "/api/v1/disputa/nr",
             json={"tracking_id": "abc", "motivo": "teste"},
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 401
 
 
 # ===========================================================================

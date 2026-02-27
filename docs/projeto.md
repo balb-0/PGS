@@ -1506,12 +1506,19 @@ if destino.upper() not in MODULOS_FISCAIS_VALIDOS:
 
 &emsp;Na ISO 25010, **autenticidade** é a subcaracterística de segurança que garante que a identidade reivindicada é legítima. Sem autenticidade, as demais subcaracterísticas de segurança (integridade, não-repúdio, confidencialidade) ficam comprometidas — é um pré-requisito transversal.
 
-#### Como será evidenciado como código
+#### Como é evidenciado como código
 
-- **Implementação:** Middleware ou dependência FastAPI (`Depends`) que valida credenciais contra um registro de contas, aplicado a todos os endpoints protegidos.
-- **Testes Blue Team:** Cenários de autenticação válida, ausente e inválida para cada endpoint protegido.
-- **Testes Red Team:** Tentativas de impersonação (enviar credenciais de outro tenant), brute-force de account-key e reuso de credenciais expiradas.
-- **Integração com DN4:** O campo `actor` no recibo de não-repúdio passa a ter significado real, pois a identidade foi verificada.
+- **Implementação:** Dependência FastAPI (`Depends`) em `src/core/api.py` com validação de autenticidade por par (`account-key`, `app-key`) registrado em `VALID_CREDENTIAL_PAIRS`.
+- **Comportamento de segurança:** Endpoints protegidos retornam HTTP `401` para credenciais ausentes e HTTP `403` para credenciais inválidas; `GET /api/v1/health` permanece público.
+- **Testes Blue Team:** Suíte `src/tests/blue_team/RNF2_authenticity_blue.py` cobrindo os critérios RNF2.CA1 a RNF2.CA6 (ausente, inválida, válida, endpoint público e isolamento entre tenants).
+- **Integração com DN4/RNF1:** O `actor` usado em não-repúdio e histórico passa a representar identidade autenticada, reforçando rastreabilidade e isolamento de acesso.
+
+#### Execução dos testes RNF2
+
+```bash
+# Executar suíte de autenticidade RNF2
+pytest src/tests/blue_team/RNF2_authenticity_blue.py -v
+```
 
 ---
 

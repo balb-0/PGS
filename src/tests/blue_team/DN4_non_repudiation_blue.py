@@ -772,7 +772,7 @@ class TestDN4ContratoAPI:
             # Sem headers
         )
 
-        assert response.status_code == 422  # FastAPI validation error
+        assert response.status_code == 401  # RNF2: credenciais ausentes
 
 
 # ===========================================================================

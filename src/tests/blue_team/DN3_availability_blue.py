@@ -567,7 +567,7 @@ class TestDN3ContratoAPI:
             "/api/v1/auditar/resilient",
             json=PAYLOAD_VALIDO,
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     @pytest.mark.parametrize("iteracao", ITERACOES)
     def test_validacoes_dn2_preservadas(self, iteracao):
