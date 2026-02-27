@@ -21,8 +21,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.mock_api import app
-from core.availability import (
+from core.api import app
+from core.api import (
     RateLimiter,
     CircuitBreaker,
     CircuitState,
@@ -567,7 +567,7 @@ class TestDN3ContratoAPI:
             "/api/v1/auditar/resilient",
             json=PAYLOAD_VALIDO,
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     @pytest.mark.parametrize("iteracao", ITERACOES)
     def test_validacoes_dn2_preservadas(self, iteracao):

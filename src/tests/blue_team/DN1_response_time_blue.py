@@ -41,7 +41,8 @@ def executar_afericao_qualidade(url, iteracoes):
 
             if response.status_code == 201:
                 dados = response.json()
-                print(f"Round {i+1:02d}: {fim:6.2f}ms | ID: {dados['id']} | Status: {status_sla}")
+                origem = dados.get('diagnostico', 'Desconhecida')
+                print(f"Round {i+1:02d}: {fim:6.2f}ms | ID: {dados['id']} | Origem: {origem} | Status: {status_sla}")
             else:
                 print(f"Round {i+1:02d}: Erro na API (Status {response.status_code})")
                 

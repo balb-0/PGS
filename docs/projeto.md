@@ -23,7 +23,6 @@
 
 # Sumário
 
-
 - [Contextualização de BD/DN, análises de qualidade e decisões arquiteturais](#contextualização-de-bddn-análises-de-qualidade-e-decisões-arquiteturais)
   - [Business drivers extraídos do TAP (o que o parceiro espera)](#business-drivers-extraídos-do-tap-o-que-o-parceiro-espera)
   - [O que significa cada análise (como BD/DN viram evidência e arquitetura)](#o-que-significa-cada-análise-como-bddn-viram-evidência-e-arquitetura)
@@ -75,10 +74,12 @@
     - [Resultados Obtidos](#resultados-obtidos-4)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações)
     - [Execução](#execução)
+    - [Execução dos Testes (API real) — DN1](#execução-dos-testes-api-real--dn1)
   - [2.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão](#22-dn2-red-team---integridade-dos-dados-fiscais-na-ingestão)
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-1)
     - [Mapa de Direcionadores de Negócio - Red Team (DN2)](#mapa-de-direcionadores-de-negócio---red-team-dn2)
     - [Métodos de Testagem](#métodos-de-testagem)
+    - [Execução dos Testes (API real)](#execução-dos-testes-api-real-dn2)
     - [Análise dos Resultados (Logs de Execução)](#análise-dos-resultados-logs-de-execução)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-1)
     - [Argumentação e Ações Corretivas](#argumentação-e-ações-corretivas)
@@ -86,6 +87,7 @@
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-2)
     - [Mapa de Direcionadores de Negócio - Red Team (DN4)](#mapa-de-direcionadores-de-negócio---red-team-dn4)
     - [Métodos de Testagem](#métodos-de-testagem-1)
+    - [Execução dos Testes (API real) — DN4](#execução-dos-testes-api-real--dn4)
     - [Análise de Resultados](#análise-de-resultados)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-2)
     - [Ações Corretivas Recomendadas](#ações-corretivas-recomendadas)
@@ -93,15 +95,34 @@
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial-3)
     - [Mapa de Direcionadores de Negócio - Red Team (DN3)](#mapa-de-direcionadores-de-negócio---red-team-dn3)
     - [Métodos de Testagem e Execução](#métodos-de-testagem-e-execução)
+    - [Execução dos Testes (API real) — DN3](#execução-dos-testes-api-real--dn3)
     - [Análise dos Resultados — Pontos Fortes](#análise-dos-resultados--pontos-fortes)
     - [Pontos de Quebra Identificados (FAIL)](#pontos-de-quebra-identificados-fail)
     - [Síntese de Impacto (Positivos x Negativos) e Priorizações](#síntese-de-impacto-positivos-x-negativos-e-priorizações-3)
+- [3. Requisitos de Software (ISO 25010)](#3-requisitos-de-software-iso-25010)
+  - [3.1 Requisitos Funcionais](#31-requisitos-funcionais)
+    - [RF1 — Consulta de Status de Processamento Assíncrono](#rf1--consulta-de-status-de-processamento-assíncrono)
+    - [RF2 — Validação de Módulos Fiscais de Destino](#rf2--validação-de-módulos-fiscais-de-destino)
+  - [3.2 Requisitos Não Funcionais](#32-requisitos-não-funcionais)
+    - [RNF1 — Eficiência de Desempenho: Capacidade (ISO 25010)](#rnf1--eficiência-de-desempenho-capacidade-iso-25010)
+    - [RNF2 — Segurança: Autenticidade (ISO 25010)](#rnf2--segurança-autenticidade-iso-25010)
+    - [RNF3 — Manutenibilidade: Testabilidade (ISO 25010)](#rnf3--manutenibilidade-testabilidade-iso-25010)
+  - [3.3 RNF — Verificação de Não-Repúdio a partir de Reclamação de Cliente](#33-rnf--verificação-de-não-repúdio-a-partir-de-reclamação-de-cliente)
+    - [Definição do Requisito](#definição-do-requisito)
+    - [Especificação da API — Endpoint de Disputa](#especificação-da-api--endpoint-de-disputa)
+    - [Mapa de Direcionadores — RNF1](#mapa-de-direcionadores--rnf1)
+    - [Implementação Técnica — Motor de Sazonalidade](#implementação-técnica--motor-de-sazonalidade)
+    - [Metodologia de Testagem (Blue Team — TDD)](#metodologia-de-testagem-blue-team--tdd-2)
+    - [Resultados Obtidos](#resultados-obtidos-5)
+    - [Execução dos Testes](#execução-dos-testes-3)
+    - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-4)
+    - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-4)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
 Este projeto segue o direcionamento do TAP, cujo problema central, em um cenário **API First**, é garantir **cobertura de testes automatizada com qualidade e relevância** — isto é, não apenas “testar mais”, mas validar comportamento correto sob diferentes condições e reduzir risco em mudanças e deploys.
 
-Para atender esse objetivo, o documento organiza o trabalho em **Business Drivers (BD)** e **Direcionadores de Negócio (DN)**. Aqui, BD/DN são usados como uma ponte entre **risco/valor de negócio** e **evidência técnica** (testes, métricas, relatórios e decisões de arquitetura). Em outras palavras, cada análise descrita nas seções seguintes responde a duas perguntas: *qual risco do parceiro estamos reduzindo?* e *qual evidência entregamos para sustentar essa redução?*
+Para atender esse objetivo, o documento organiza o trabalho em **Business Drivers (BD)** e **Direcionadores de Negócio (DN)**. Aqui, BD/DN são usados como uma ponte entre **risco/valor de negócio** e **evidência técnica** (testes, métricas, relatórios e decisões de arquitetura). Em outras palavras, cada análise descrita nas seções seguintes responde a duas perguntas: _qual risco do parceiro estamos reduzindo?_ e _qual evidência entregamos para sustentar essa redução?_
 
 ### Business drivers extraídos do TAP (o que o parceiro espera)
 
@@ -116,14 +137,14 @@ Do TAP, derivam-se os principais drivers que orientam o recorte e a forma de ava
 
 Para garantir rastreabilidade entre expectativa e execução, as análises BD/DN apresentadas no documento são organizadas para cobrir esses drivers com evidências verificáveis:
 
-| Driver (TAP) | Como aparece nas análises (BD/DN) | Evidência gerada no documento |
-| --- | --- | --- |
-| Confiabilidade e estabilidade | Integridade de payload, disponibilidade/resiliência e não-repúdio | Casos de teste, critérios de aceite, resultados (pass/fail), limitações e recomendações |
-| Velocidade com confiança no deploy | Automação de testes orientada a dados (TDD) e execução repetível | Procedimentos de execução, suíte automatizada e resultados reprodutíveis |
-| Relevância da cobertura | Priorização por risco de negócio e contrato da API | Justificativa de escopo, mapeamento de “+” e “–”, riscos fora do foco e próximos passos |
-| Observabilidade e relatórios acionáveis | Métricas, SLAs, alertas e health checks | Métricas reportadas (ex.: conformidade), alertas/limiares e interpretação de impacto |
-| CI/CD e replicabilidade | Estrutura e disciplina de execução local/CLI visando pipeline | Organização do trabalho e instruções de execução compatíveis com esteira |
-| Qualidade/arquitetura/segurança | Avaliação de trade-offs arquiteturais sob risco | Decisões arquiteturais vinculadas a riscos e evidências de mitigação |
+| Driver (TAP)                            | Como aparece nas análises (BD/DN)                                 | Evidência gerada no documento                                                           |
+| --------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Confiabilidade e estabilidade           | Integridade de payload, disponibilidade/resiliência e não-repúdio | Casos de teste, critérios de aceite, resultados (pass/fail), limitações e recomendações |
+| Velocidade com confiança no deploy      | Automação de testes orientada a dados (TDD) e execução repetível  | Procedimentos de execução, suíte automatizada e resultados reprodutíveis                |
+| Relevância da cobertura                 | Priorização por risco de negócio e contrato da API                | Justificativa de escopo, mapeamento de “+” e “–”, riscos fora do foco e próximos passos |
+| Observabilidade e relatórios acionáveis | Métricas, SLAs, alertas e health checks                           | Métricas reportadas (ex.: conformidade), alertas/limiares e interpretação de impacto    |
+| CI/CD e replicabilidade                 | Estrutura e disciplina de execução local/CLI visando pipeline     | Organização do trabalho e instruções de execução compatíveis com esteira                |
+| Qualidade/arquitetura/segurança         | Avaliação de trade-offs arquiteturais sob risco                   | Decisões arquiteturais vinculadas a riscos e evidências de mitigação                    |
 
 ### O que significa cada análise (como BD/DN viram evidência e arquitetura)
 
@@ -318,7 +339,7 @@ pytest src/tests/blue_team/validation.py::TestDN2ContractValidation -v
 
 ### Decisão Arquitetural e Contexto de BD/DN
 
-&emsp;A validação rigorosa de payloads antes do processamento é uma decisão arquitetural derivada diretamente de um risco de negócio crítico: em um sistema de auditoria fiscal com **alto volume e intensidade de ingestão**, permitir que dados malformados avancem no pipeline consome recursos computacionais desnecessariamente e pode gerar resultados incorretos que comprometam a **precisão do atendimento** ao cliente. O padrão *fail-fast* (rejeitar antes de processar) foi adotado para proteger a integridade do fluxo fim a fim.
+&emsp;A validação rigorosa de payloads antes do processamento é uma decisão arquitetural derivada diretamente de um risco de negócio crítico: em um sistema de auditoria fiscal com **alto volume e intensidade de ingestão**, permitir que dados malformados avancem no pipeline consome recursos computacionais desnecessariamente e pode gerar resultados incorretos que comprometam a **precisão do atendimento** ao cliente. O padrão _fail-fast_ (rejeitar antes de processar) foi adotado para proteger a integridade do fluxo fim a fim.
 
 &emsp;A abordagem de validar **antes** de qualquer operação assíncrona (`await`) reflete uma escolha arquitetural consciente: garantir atomicidade e evitar que recursos de processamento, rastreio e armazenamento sejam alocados para dados que não atendem aos requisitos mínimos de negócio. Essa estratégia também cria uma base sólida para futuras camadas de **aprendizado de máquina**, já que modelos de detecção de anomalias ou classificação fiscal dependem de dados de entrada com integridade garantida.
 
@@ -878,6 +899,7 @@ pytest src/tests/blue_team/non_repudiation.py::TestDN4ContratoAPI -v
 - Cenários de carga mista (requisições válidas e inválidas simultaneamente) não foram explorados, embora representem o padrão real de tráfego em produção.
 
 **Priorização sugerida:**
+
 1. **Revalidar em ambiente com rede real e contenção de recursos** — essencial para confirmar se a resiliência observada se mantém fora do ambiente ideal.
 2. **Adicionar testes de carga sustentada** — complementar as rajadas com cenários de estresse prolongado para mapear comportamento ao longo do tempo.
 3. **Combinar cenários de DN1 com DN3** — testar latência sob condições onde rate limiting e circuit breaker estejam ativos simultaneamente.
@@ -891,6 +913,20 @@ make stress
 # Direto com pytest
 .venv/bin/python -m pytest src/tests/red_team/response_time_red.py -v -s
 ```
+
+### Execução dos Testes (API real) — DN1
+
+&emsp;Os testes de latência podem rodar contra a **API real**. A forma mais prática é usar um arquivo **.env** na raiz do projeto: defina `RED_TEAM_API_URL=http://127.0.0.1:8000` (ou a URL da sua API), suba a API em outro terminal e rode o pytest normalmente:
+
+```bash
+# Terminal 1 — subir a API (a partir de src/)
+uvicorn core.api:app --reload --port 8000
+
+# Terminal 2 — com .env configurado, basta:
+pytest src/tests/red_team/DN1_response_time_red.py -v -s
+```
+
+Sem `RED_TEAM_API_URL` no .env ou no shell, o script usa TestClient (in-process).
 
 ## 2.2 DN2 (Red Team) - Integridade dos Dados Fiscais na Ingestão
 
@@ -914,8 +950,24 @@ make stress
 
 O teste foi conduzido utilizando o framework **pytest-9.0.2** em ambiente **Python 3.13.3**.
 
-- **Abordagem**: Foi utilizado o `FastAPI TestClient` para simular ataques de injeção de dados e poluição de schema.
+- **Abordagem**: Os testes podem rodar de duas formas: (1) com **TestClient** (in-process), típico para CI; (2) contra a **API real** (servidor HTTP em execução), definindo a variável de ambiente `RED_TEAM_API_URL`.
 - **Escopo**: Foco exclusivo na validação de entrada (Input Validation) antes da geração do `tracking_id` e do processamento assíncrono.
+
+### Execução dos Testes (API real) — DN2
+
+&emsp;Os testes adversariais de DN2 podem ser executados contra a **API real** (servidor já em execução), permitindo validar o comportamento em ambiente próximo ao de produção (rede, serialização HTTP, timeouts).
+
+**Forma recomendada:** usar **.env** na raiz do projeto. Defina `RED_TEAM_API_URL=http://127.0.0.1:8000` no arquivo `.env` na raíz do projeto. Suba a API em outro terminal e rode o pytest:
+
+```bash
+# Terminal 1 — a partir de src/
+uvicorn core.api:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — com .env configurado
+pytest src/tests/red_team/DN2_validation_red.py -v -s
+```
+
+Sem `RED_TEAM_API_URL` no .env ou no shell, o script usa o **TestClient** (in-process).
 
 ### Análise dos Resultados (Logs de Execução)
 
@@ -936,7 +988,7 @@ O teste de **Resiliência Numérica** falhou em três cenários específicos:
 
 ### Síntese de Impacto (Positivos x Negativos) e Priorizações
 
-&emsp;Do ponto de vista de BD/DN, os testes adversariais de integridade validam se as decisões arquiteturais de validação *fail-fast* resistem a entradas maliciosas e extremas que o Blue Team não exercita, e se o fluxo de auditoria preserva a **precisão de atendimento** sob condições adversariais.
+&emsp;Do ponto de vista de BD/DN, os testes adversariais de integridade validam se as decisões arquiteturais de validação _fail-fast_ resistem a entradas maliciosas e extremas que o Blue Team não exercita, e se o fluxo de auditoria preserva a **precisão de atendimento** sob condições adversariais.
 
 **Aspectos positivos (para além do foco imediato):**
 
@@ -985,9 +1037,18 @@ Para que este ativo de software evolua em alinhamento com os riscos de negócio 
 
 ### Métodos de Testagem
 
-- Script adversarial: `src/tests/red_team/non_repudiation_red.py`
-- Abordagem: `FastAPI TestClient` com simulação de atacante e intruso entre contas.
-- Escopo: endpoint `POST /api/v1/auditar/nr` e consultas `GET /api/v1/audit-log`.
+- Script adversarial: `src/tests/red_team/DN4_non_repudiation_red.py`
+- Abordagem: `FastAPI TestClient` (in-process) ou requisições HTTP contra a API real quando `RED_TEAM_API_URL` está definida.
+- Escopo: endpoint `POST /api/v1/auditar/nr` e consultas `GET /api/v1/audit-log`. O teste R5 (chain tampering) só roda in-process.
+
+### Execução dos Testes (API real) — DN4
+
+&emsp;Com **.env** configurado (`RED_TEAM_API_URL` em `.env.example`), suba a API e rode o pytest. O teste **DN4.R5** (adulteração da cadeia de hash) é pulado nesse modo por depender de estado interno do processo.
+
+```bash
+# Com .env na raiz (RED_TEAM_API_URL=http://127.0.0.1:8000)
+pytest src/tests/red_team/DN4_non_repudiation_red.py -v -s
+```
 
 ### Análise de Resultados
 
@@ -1034,73 +1095,82 @@ Para que este ativo de software evolua em alinhamento com os riscos de negócio 
 
 &emsp;Foram definidos cenários adversariais alinhados aos mecanismos de disponibilidade:
 
-| ID          | Direcionador Adversarial                         | Objetivo Técnico                                                                                      | Status   |
-| :---------- | :----------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :------- |
-| **DN3.R1**  | Rate Limit Bypass por Header Spoofing            | Tentar burlar o controle de taxa variando `account-key` em rajadas de alta intensidade.              | **PASS** |
-| **DN3.R2**  | Circuit Breaker Race Condition                   | Estressar o `CircuitBreaker` com chamadas concorrentes de sucesso/falha e validar consistência.      | **PASS** |
-| **DN3.R3**  | Idempotency Key Collision com Payload Diferente  | Enviar mesma `idempotency-key` com payloads distintos para validar sinalização correta de replay.    | **FAIL** |
-| **DN3.R4**  | Health Check Information Leakage                 | Verificar se o `GET /health` não vaza informações sensíveis de infraestrutura/stack interna.         | **PASS** |
-| **DN3.R5**  | Slowloris / Connection Exhaustion (simples)      | Simular requisições “lentas” para testar degradação controlada sem colapso nem cascata de erros.     | **PASS** |
-| **DN3.R6**  | Rate Limit Memory Exhaustion                     | Inflar o dicionário interno do rate limiter com chaves gigantes para medir risco de consumo de RAM. | **PASS** |
-| **DN3.R8**  | Idempotency Store Unbounded Growth               | Forçar muitas chaves de idempotência únicas e observar crescimento (ou não) do `IdempotencyStore`.  | **FAIL** |
+| ID         | Direcionador Adversarial                        | Objetivo Técnico                                                                                    | Status   |
+| :--------- | :---------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **DN3.R1** | Rate Limit Bypass por Header Spoofing           | Tentar burlar o controle de taxa variando `account-key` em rajadas de alta intensidade.             | **PASS** |
+| **DN3.R2** | Circuit Breaker Race Condition                  | Estressar o `CircuitBreaker` com chamadas concorrentes de sucesso/falha e validar consistência.     | **PASS** |
+| **DN3.R3** | Idempotency Key Collision com Payload Diferente | Enviar mesma `idempotency-key` com payloads distintos para validar sinalização correta de replay.   | **FAIL** |
+| **DN3.R4** | Health Check Information Leakage                | Verificar se o `GET /health` não vaza informações sensíveis de infraestrutura/stack interna.        | **PASS** |
+| **DN3.R5** | Slowloris / Connection Exhaustion (simples)     | Simular requisições “lentas” para testar degradação controlada sem colapso nem cascata de erros.    | **PASS** |
+| **DN3.R6** | Rate Limit Memory Exhaustion                    | Inflar o dicionário interno do rate limiter com chaves gigantes para medir risco de consumo de RAM. | **PASS** |
+| **DN3.R8** | Idempotency Store Unbounded Growth              | Forçar muitas chaves de idempotência únicas e observar crescimento (ou não) do `IdempotencyStore`.  | **FAIL** |
 
 ### Métodos de Testagem e Execução
 
-- **Script**: `src/tests/red_team/availability_red.py`  
-- **Ferramenta**: `pytest 8.4.2` em ambiente `Python 3.11.9` com `FastAPI TestClient`.  
+- **Script**: `src/tests/red_team/DN3_availability_red.py`
+- **Ferramenta**: `pytest` com `FastAPI TestClient` (in-process) ou requisições HTTP quando `RED_TEAM_API_URL` está definida.
+- Em modo API real, os testes **DN3.R2**, **DN3.R6** e **DN3.R8** são pulados (dependem de estado interno: circuit_breaker, rate_limiter, idempotency_store).
 - **Execução analisada** (`13/02/2026`): 7 itens coletados, com o seguinte resumo:
-  - **5 testes PASS**: DN3.R1, DN3.R2, DN3.R4, DN3.R5, DN3.R6  
-  - **2 testes FAIL**: DN3.R3, DN3.R8  
+  - **5 testes PASS**: DN3.R1, DN3.R2, DN3.R4, DN3.R5, DN3.R6
+  - **2 testes FAIL**: DN3.R3, DN3.R8
 
 &emsp;Do ponto de vista de BD/DN, a suíte cobre tanto **fluxos normais de alta intensidade** (rajadas, concorrência, payloads lentos) quanto **condições extremas de dados** (chaves gigantes, muitas chaves únicas), indo além do foco original do Blue Team para mapear riscos adicionais de saturação e inconsistências lógicas.
 
+### Execução dos Testes (API real) — DN3
+
+&emsp;Com a API em execução, os testes podem rodar contra a API real. Os cenários **R2** (circuit breaker race), **R6** (rate limit memory) e **R8** (idempotency store growth) são pulados nesse modo por dependerem de singletons in-process.
+
+```bash
+RED_TEAM_API_URL=http://127.0.0.1:8000 pytest src/tests/red_team/DN3_availability_red.py -v -s
+```
+
 ### Análise dos Resultados — Pontos Fortes
 
-- **Fluxos contínuos sob carga (DN3.R1, DN3.R5)**:  
-  - Mesmo com **rajadas de contas diferentes** e simulação de requisições lentas, a API manteve códigos de retorno dentro do conjunto esperado `(201, 400, 429, 503)` sem explodir em erros 5xx não tratados.  
+- **Fluxos contínuos sob carga (DN3.R1, DN3.R5)**:
+  - Mesmo com **rajadas de contas diferentes** e simulação de requisições lentas, a API manteve códigos de retorno dentro do conjunto esperado `(201, 400, 429, 503)` sem explodir em erros 5xx não tratados.
   - O endpoint de **health check** permaneceu responsivo, essencial para que camadas de orquestração e ML de roteamento/auto-scaling consigam reagir rapidamente ao estado do sistema.
 
-- **Consistência de estado do circuit breaker (DN3.R2)**:  
-  - A execução multithread confirmou que o contador de falhas nunca fica negativo e que o `CircuitState` se mantém em um dos estados válidos (`CLOSED`, `OPEN`, `HALF_OPEN`).  
+- **Consistência de estado do circuit breaker (DN3.R2)**:
+  - A execução multithread confirmou que o contador de falhas nunca fica negativo e que o `CircuitState` se mantém em um dos estados válidos (`CLOSED`, `OPEN`, `HALF_OPEN`).
   - Isso reforça uma **decisão arquitetural crítica de BD/DN**: proteger o backend fiscal de falhas em cascata sem entrar em estados “zumbis” que poderiam gerar decisões erradas em pipelines de auditoria automatizados.
 
-- **Observabilidade segura (DN3.R4)**:  
-  - O `GET /api/v1/health` retorna apenas o contrato público desenhado (status, uptime, métricas de erro, estado do circuito), **sem vazar stack trace, IP, paths ou dependências internas**.  
+- **Observabilidade segura (DN3.R4)**:
+  - O `GET /api/v1/health` retorna apenas o contrato público desenhado (status, uptime, métricas de erro, estado do circuito), **sem vazar stack trace, IP, paths ou dependências internas**.
   - Isso equilibra **precisão de atendimento** (dados suficientes para operação e monitoramento) com **segurança** (não expor informações sensíveis a atacantes).
 
-- **Detecção de riscos de consumo de memória (DN3.R6)**:  
-  - O teste confirma que o dicionário interno do `RateLimiter` cresce proporcionalmente ao número de chaves únicas, documentando um comportamento de **crescimento potencialmente ilimitado**.  
+- **Detecção de riscos de consumo de memória (DN3.R6)**:
+  - O teste confirma que o dicionário interno do `RateLimiter` cresce proporcionalmente ao número de chaves únicas, documentando um comportamento de **crescimento potencialmente ilimitado**.
   - Embora o teste passe, o resultado é usado como **evidência de risco de BD/DN**: em cenários reais de tráfego hostil, o consumo de memória pode comprometer a disponibilidade se não houver políticas de expiração/compactação.
 
 ### Pontos de Quebra Identificados (FAIL)
 
 **1. DN3.R3 — Idempotency Key Collision com Payload Diferente**
 
-- **Cenário**:  
-  - Duas requisições são enviadas para `POST /api/v1/auditar/resilient` com a **mesma `idempotency-key`** (`fixed-idempotency-key-r3`), mas com payloads diferentes (`modulo_dn3_r3_v1` vs. `modulo_dn3_r3_v2`).  
+- **Cenário**:
+  - Duas requisições são enviadas para `POST /api/v1/auditar/resilient` com a **mesma `idempotency-key`** (`fixed-idempotency-key-r3`), mas com payloads diferentes (`modulo_dn3_r3_v1` vs. `modulo_dn3_r3_v2`).
   - Espera-se, do ponto de vista de negócio, que a API:
-    1. **retorne o mesmo `tracking_id` e os mesmos detalhes** da primeira requisição (sem reprocessar), e  
+    1. **retorne o mesmo `tracking_id` e os mesmos detalhes** da primeira requisição (sem reprocessar), e
     2. **sinalize claramente que a segunda resposta é um replay**, via `availability.idempotent_replay = true`.
 
-- **Resultado observado na execução**:  
-  - Asserções de equivalência de `tracking_id`, `volume_processado` e `modulo` passaram, indicando que o **fluxo de idempotência básico funciona** (não há reprocessamento indevido).  
+- **Resultado observado na execução**:
+  - Asserções de equivalência de `tracking_id`, `volume_processado` e `modulo` passaram, indicando que o **fluxo de idempotência básico funciona** (não há reprocessamento indevido).
   - A falha ocorreu especificamente na expectativa de que:
     ```python
     data2["availability"]["idempotent_replay"] is True
     # valor retornado: False
     ```
 
-- **Leitura de BD/DN**:  
-  - O fluxo de processamento está correto (não duplica operação), mas a **sinalização de replay é imprecisa**.  
+- **Leitura de BD/DN**:
+  - O fluxo de processamento está correto (não duplica operação), mas a **sinalização de replay é imprecisa**.
   - Isso afeta diretamente a confiabilidade de **fluxos inteligentes** (retries, billing, antifraude, dashboards, modelos de ML) que dependem desta flag para diferenciar primeiras execuções de replays.
 
 **2. DN3.R8 — Idempotency Store Unbounded Growth**
 
-- **Cenário**:  
-  - O teste envia **centenas de requisições** para `POST /api/v1/auditar/resilient`, cada uma com uma `idempotency-key` única (`unique-idempo-{i}`), alternando `account-key` para não acionar o rate limit.  
+- **Cenário**:
+  - O teste envia **centenas de requisições** para `POST /api/v1/auditar/resilient`, cada uma com uma `idempotency-key` única (`unique-idempo-{i}`), alternando `account-key` para não acionar o rate limit.
   - A expectativa (e documentação) é que o `IdempotencyStore` cresça de forma **não limitada**, refletindo aproximadamente o número de chaves únicas enviadas.
 
-- **Resultado observado na execução**:  
+- **Resultado observado na execução**:
   - Na execução analisada, com `num_requests = 500`, o assert:
     ```python
     assert idempotency_store.size() >= num_requests
@@ -1108,28 +1178,665 @@ Para que este ativo de software evolua em alinhamento com os riscos de negócio 
     ```
     falhou, indicando que o store atingiu apenas **10 entradas**, muito abaixo do volume ingerido.
 
-- **Leitura de BD/DN**:  
-  - O comportamento real do `IdempotencyStore` **não corresponde à hipótese de crescimento ilimitado** usada na modelagem de risco.  
+- **Leitura de BD/DN**:
+  - O comportamento real do `IdempotencyStore` **não corresponde à hipótese de crescimento ilimitado** usada na modelagem de risco.
   - Há um trade-off importante:
-    - **Ponto positivo**: existe um “freio” implícito que evita explosão de memória por chaves infinitas, ajudando a preservar disponibilidade em cenários extremos.  
+    - **Ponto positivo**: existe um “freio” implícito que evita explosão de memória por chaves infinitas, ajudando a preservar disponibilidade em cenários extremos.
     - **Ponto negativo**: parte dos replays pode **não ser registrada**, reduzindo rastreabilidade, precisão analítica (incluindo ML) e transparência em auditorias de negócio.
 
 ### Síntese de Impacto (Positivos x Negativos) e Priorizações
 
 - **Aspectos Positivos (para além do foco imediato dos testes)**:
-  - A arquitetura de DN3 combina **fluxos bem definidos** (rate limit → circuit breaker → health → idempotência) que protegem o BD/DN de indisponibilidades catastróficas, mantendo a API operante mesmo sob abuso.  
-  - O desenho de métricas (`uptime`, `error_rate_percent`, `circuit_breaker`, contadores internos) cria base sólida para **painéis em tempo real e modelos de aprendizado de máquina**, capazes de detectar padrões de degradação e ajustar capacidade/políticas automaticamente.  
+  - A arquitetura de DN3 combina **fluxos bem definidos** (rate limit → circuit breaker → health → idempotência) que protegem o BD/DN de indisponibilidades catastróficas, mantendo a API operante mesmo sob abuso.
+  - O desenho de métricas (`uptime`, `error_rate_percent`, `circuit_breaker`, contadores internos) cria base sólida para **painéis em tempo real e modelos de aprendizado de máquina**, capazes de detectar padrões de degradação e ajustar capacidade/políticas automaticamente.
   - A separação entre **contrato público estável** e detalhes internos reforça segurança e governança de dados, sem sacrificar a precisão necessária para operação e monitoramento.
 
 - **Aspectos Negativos / Riscos Mapeados**:
-  - Inconsistência na sinalização de `idempotent_replay` (DN3.R3) reduz a confiabilidade de camadas externas que usam essa flag para decisões de negócio.  
-  - Divergência entre a premissa de crescimento ilimitado e o comportamento real do `IdempotencyStore` (DN3.R8) pode **mascarar replays** e dificultar análises retroativas.  
+  - Inconsistência na sinalização de `idempotent_replay` (DN3.R3) reduz a confiabilidade de camadas externas que usam essa flag para decisões de negócio.
+  - Divergência entre a premissa de crescimento ilimitado e o comportamento real do `IdempotencyStore` (DN3.R8) pode **mascarar replays** e dificultar análises retroativas.
   - O crescimento sem política explícita de TTL/eviction no `RateLimiter` continua sendo risco de longo prazo em ambientes com muitas contas.
 
 - **Priorização sugerida (considerando limitações de tempo/conhecimento)**:
-  1. **Corrigir rapidamente a sinalização de replay (DN3.R3)** — mudança pontual de contrato, com impacto direto na precisão de monitoramento e automações.  
-  2. **Rever o comportamento do `IdempotencyStore` (DN3.R8)** — alinhar implementação à estratégia de negócio: ou documentar o limite/eviction como decisão consciente, ou implementar de fato políticas de crescimento controlado (TTL, max-size, limpeza).  
+  1. **Corrigir rapidamente a sinalização de replay (DN3.R3)** — mudança pontual de contrato, com impacto direto na precisão de monitoramento e automações.
+  2. **Rever o comportamento do `IdempotencyStore` (DN3.R8)** — alinhar implementação à estratégia de negócio: ou documentar o limite/eviction como decisão consciente, ou implementar de fato políticas de crescimento controlado (TTL, max-size, limpeza).
   3. **Endereçar o risco de memória no rate limit** — definir políticas de expiração/compactação das chaves pouco usadas, preservando disponibilidade e escalabilidade.
 
 &emsp;Com isso, o Red Team mostra que, embora **5 de 7 cenários DN3 adversariais tenham passado**, ainda existem lacunas entre o **modelo de risco de BD/DN** e o **comportamento efetivo do software**, evidenciando as decisões arquiteturais tomadas e os próximos passos de priorização em função de tempo, conhecimento e risco de negócio.
 
+---
+
+# 3. Requisitos de Software (ISO 25010)
+
+&emsp;Esta seção formaliza os **Requisitos Funcionais (RF)** e **Requisitos Não Funcionais (RNF)** derivados dos Business Drivers, dos resultados das análises Blue/Red Team (seções 1 e 2) e do TAP do parceiro ASIS TaxTech. Cada requisito é rastreável a um risco de negócio, a uma característica de qualidade da **ISO/IEC 25010:2023** e a uma evidência técnica que será implementada como código executável em etapas futuras.
+
+&emsp;A ISO/IEC 25010 organiza a qualidade de produto de software em 8 características principais: **Adequação Funcional**, **Eficiência de Desempenho**, **Compatibilidade**, **Usabilidade**, **Confiabilidade**, **Segurança**, **Manutenibilidade** e **Portabilidade**. Os requisitos abaixo foram selecionados com base na interseção entre as necessidades do parceiro (TAP), os gaps identificados nos testes adversariais (Red Team) e a viabilidade de implementação como código verificável dentro do escopo do projeto.
+
+### Rastreabilidade TAP → Requisitos → Evidência
+
+| Requisito | Tipo          | Característica ISO 25010              | Driver TAP                          | Gap/DN de origem                               | Evidência planejada                  |
+| :-------- | :------------ | :------------------------------------ | :---------------------------------- | :--------------------------------------------- | :----------------------------------- |
+| **RF1**   | Funcional     | Adequação Funcional — Completude      | Rastreio e efetivação de processos  | DN1 (tracking_id sem consulta de status)       | Endpoint + testes automatizados      |
+| **RF2**   | Funcional     | Adequação Funcional — Correção        | Validação de payload de resposta    | DN2 Blue/Red (destino sem validação semântica) | Validação + testes automatizados     |
+| **RNF1**  | Não Funcional | Eficiência de Desempenho — Capacidade | Confiabilidade sob alta intensidade | DN1 Red (carga concorrente)                    | Testes de capacidade com limiares    |
+| **RNF2**  | Não Funcional | Segurança — Autenticidade             | Segurança e auditabilidade          | DN4 Red (DN4.R2 — header impersonation)        | Testes de autenticação               |
+| **RNF3**  | Não Funcional | Manutenibilidade — Testabilidade      | Relatórios de execução e CI/CD      | TAP MVP (relatório HTML, execução CLI)         | Cobertura + relatórios automatizados |
+
+---
+
+## 3.1 Requisitos Funcionais
+
+### RF1 — Consulta de Status de Processamento Assíncrono
+
+**Característica ISO 25010:** Adequação Funcional — Completude Funcional
+
+> _Completude funcional: grau em que o conjunto de funções cobre todas as tarefas e objetivos de usuário especificados._ (ISO/IEC 25010:2023, 4.2.1)
+
+#### Descrição
+
+&emsp;O fluxo atual de auditoria fiscal retorna um `tracking_id` ao submeter um lote de documentos (DN1), confirmando que a requisição foi aceita para processamento assíncrono. Porém, **não existe um mecanismo formal para o cliente consultar o status desse processamento** após a submissão. Na prática, o cliente recebe um identificador sem ter como verificar se o lote está pendente, em processamento, concluído ou em erro — lacuna identificada na própria estrutura do código, que referencia `ASIS_STATUS_URL` para consulta de processos na API real da ASIS.
+
+&emsp;Este requisito formaliza a necessidade de um endpoint de consulta de status, completando o ciclo de vida do processamento assíncrono e garantindo que o fluxo de auditoria fiscal tenha **rastreabilidade fim a fim**.
+
+#### Regras de Negócio
+
+**RF1.1 — Endpoint de consulta por tracking_id**
+
+- A API deve fornecer o endpoint `GET /api/v1/processo/{tracking_id}` que retorna o status atual do processamento.
+- O endpoint exige autenticação via `account-key` e `app-key`.
+
+**RF1.2 — Estados de processamento**
+
+- O sistema deve refletir os seguintes estados de ciclo de vida:
+  - `pendente`: lote recebido, aguardando início de processamento.
+  - `processando`: auditoria em execução.
+  - `concluido`: processamento finalizado com sucesso.
+  - `erro`: falha durante o processamento.
+- A transição entre estados deve ser unidirecional e consistente.
+
+**RF1.3 — Estrutura de resposta**
+
+- A resposta deve conter: `tracking_id`, `status`, `sessao_cliente`, `destino`, `valor`, `submitted_at` (timestamp de submissão) e `updated_at` (timestamp da última atualização de estado).
+- Para status `concluido`, a resposta deve incluir o campo `resultado` com detalhes do processamento.
+- Para status `erro`, a resposta deve incluir o campo `erro_detalhes` com a descrição da falha.
+
+**RF1.4 — Tracking_id inexistente**
+
+- Consulta com `tracking_id` não encontrado retorna HTTP 404 com mensagem: `"Processo não encontrado"`.
+
+#### Especificação da API
+
+**Endpoint:** `GET /api/v1/processo/{tracking_id}`
+
+**Headers obrigatórios:** `account-key`, `app-key`
+
+**Resposta de sucesso (HTTP 200):**
+
+```json
+{
+  "tracking_id": "uuid-v4",
+  "status": "concluido",
+  "sessao_cliente": "SESSAO_001",
+  "destino": "EFD_ICMS_IPI",
+  "valor": 3200.0,
+  "submitted_at": "2026-02-12T12:00:00.000000+00:00",
+  "updated_at": "2026-02-12T12:00:01.500000+00:00",
+  "resultado": {
+    "documentos_processados": 3200,
+    "conformidade": "Conforme"
+  }
+}
+```
+
+**Resposta para tracking_id inexistente (HTTP 404):**
+
+```json
+{
+  "detail": "Processo não encontrado"
+}
+```
+
+#### Critérios de Aceite
+
+| ID      | Critério                                                                                                                                                                           | Evidência                          |
+| :------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------- |
+| RF1.CA1 | Após submissão via `POST /api/v1/auditar`, o `tracking_id` retornado deve ser consultável via `GET /api/v1/processo/{tracking_id}` com status inicial `pendente` ou `processando`. | Teste automatizado (Blue Team)     |
+| RF1.CA2 | O status deve evoluir para `concluido` após processamento assíncrono bem-sucedido.                                                                                                 | Teste automatizado com polling     |
+| RF1.CA3 | Consulta com `tracking_id` inválido/inexistente retorna HTTP 404.                                                                                                                  | Teste automatizado (Blue Team)     |
+| RF1.CA4 | A resposta contém todos os campos especificados (`tracking_id`, `status`, `sessao_cliente`, `destino`, `valor`, `submitted_at`, `updated_at`).                                     | Validação de schema                |
+| RF1.CA5 | O endpoint exige autenticação — requisições sem headers retornam HTTP 401.                                                                                                         | Teste automatizado (Blue/Red Team) |
+
+#### Vínculo com BD/DN e TAP
+
+&emsp;Este requisito decorre diretamente do fluxo de **Rastreio** descrito no TAP ("geração de ID de processo") e da decisão arquitetural do DN1 de separar resposta rápida (`tracking_id`) de processamento assíncrono. Sem um endpoint de consulta, o `tracking_id` é uma promessa sem verificação — o cliente não tem como confirmar a **efetivação** do processamento fiscal. A referência a `ASIS_STATUS_URL` no código-fonte confirma que a API real da ASIS já possui essa funcionalidade, tornando este requisito uma necessidade de paridade do mock.
+
+&emsp;Do ponto de vista de qualidade ISO 25010, a ausência deste endpoint configura uma lacuna de **completude funcional**: a tarefa do usuário (submeter e acompanhar auditoria fiscal) não está coberta de ponta a ponta.
+
+#### Como será evidenciado como código
+
+- **Implementação:** Endpoint `GET /api/v1/processo/{tracking_id}` em `src/core/api.py` com store em memória dos processos submetidos.
+- **Testes Blue Team:** Suite em `src/tests/blue_team/` com cenários de consulta válida, tracking_id inexistente, evolução de status e validação de schema de resposta.
+- **Testes Red Team:** Cenários adversariais como consulta com tracking_id forjado, acesso a processos de outro tenant e polling excessivo.
+
+---
+
+### RF2 — Validação de Módulos Fiscais de Destino
+
+**Característica ISO 25010:** Adequação Funcional — Correção Funcional
+
+> _Correção funcional: grau em que um produto ou sistema fornece resultados corretos com o grau de precisão necessário._ (ISO/IEC 25010:2023, 4.2.2)
+
+#### Descrição
+
+&emsp;A análise dos testes Blue Team (DN2) e Red Team (DN2.R2) identificou que o campo `destino` aceita **qualquer string não vazia** como módulo fiscal de destino, sem validação contra uma lista de módulos reais. Isso significa que um lote de auditoria pode ser submetido para um módulo inexistente (ex.: `destino: "MODULO_FALSO"`), gerando um `tracking_id` e iniciando processamento assíncrono para um destino que não existe na plataforma ASIS.
+
+&emsp;Em um sistema fiscal de **alta intensidade**, essa lacuna compromete a **correção funcional**: o sistema produz resultados para destinos inválidos, consumindo recursos e gerando dados sem significado operacional. Este requisito formaliza a necessidade de validar o campo `destino` contra um conjunto de módulos fiscais permitidos.
+
+#### Regras de Negócio
+
+**RF2.1 — Lista de módulos fiscais válidos**
+
+- A API deve manter uma lista de módulos fiscais de destino aceitos pelo sistema.
+- Os módulos válidos para o escopo atual são:
+  - `EFD_ICMS_IPI` — Escrituração Fiscal Digital de ICMS/IPI
+  - `EFD_CONTRIBUICOES` — Escrituração Fiscal Digital de Contribuições (PIS/COFINS)
+  - `NCM_AUDIT` — Auditoria de Nomenclatura Comum do Mercosul
+  - `ECF` — Escrituração Contábil Fiscal
+  - `SPED_FISCAL` — Sistema Público de Escrituração Digital Fiscal
+- A lista deve ser configurável (variável ou constante) para permitir expansão futura sem alteração de lógica.
+
+**RF2.2 — Rejeição de módulo inválido**
+
+- Requisições com `destino` fora da lista de módulos válidos devem ser rejeitadas com HTTP 400.
+- A mensagem de erro deve ser clara e informativa: `"Módulo fiscal de destino inválido. Módulos aceitos: [lista]"`.
+- A rejeição ocorre **antes** de qualquer processamento assíncrono (padrão _fail-fast_ do DN2).
+
+**RF2.3 — Case-insensitive**
+
+- A validação do campo `destino` deve ser case-insensitive (ex.: `efd_icms_ipi` e `EFD_ICMS_IPI` são ambos aceitos).
+- O valor armazenado e retornado na resposta é sempre normalizado para uppercase.
+
+**RF2.4 — Sem efeitos colaterais para destino inválido**
+
+- Requisições com `destino` inválido **NÃO** geram `tracking_id`.
+- Requisições com `destino` inválido **NÃO** iniciam processamento assíncrono.
+- Requisições com `destino` inválido **NÃO** são registradas no log de auditoria (DN4).
+
+#### Especificação Técnica
+
+**Endpoint afetado:** `POST /api/v1/auditar` (e variantes `/auditar/resilient`, `/auditar/nr`)
+
+**Validação a ser implementada:**
+
+```python
+MODULOS_FISCAIS_VALIDOS = {
+    "EFD_ICMS_IPI",
+    "EFD_CONTRIBUICOES",
+    "NCM_AUDIT",
+    "ECF",
+    "SPED_FISCAL",
+}
+
+# RF2.2 + RF2.3: Validação case-insensitive de destino
+if destino.upper() not in MODULOS_FISCAIS_VALIDOS:
+    raise HTTPException(
+        status_code=400,
+        detail=f"Módulo fiscal de destino inválido. Módulos aceitos: {sorted(MODULOS_FISCAIS_VALIDOS)}"
+    )
+```
+
+#### Critérios de Aceite
+
+| ID      | Critério                                                                                                                | Evidência           |
+| :------ | :---------------------------------------------------------------------------------------------------------------------- | :------------------ |
+| RF2.CA1 | Requisição com `destino: "EFD_ICMS_IPI"` é aceita (HTTP 201).                                                           | Teste automatizado  |
+| RF2.CA2 | Requisição com `destino: "MODULO_INEXISTENTE"` é rejeitada (HTTP 400) com mensagem contendo a lista de módulos aceitos. | Teste automatizado  |
+| RF2.CA3 | Validação é case-insensitive: `destino: "efd_icms_ipi"` é aceito.                                                       | Teste automatizado  |
+| RF2.CA4 | Requisição com `destino` inválido não gera `tracking_id` nem inicia processamento.                                      | Teste automatizado  |
+| RF2.CA5 | Todos os 5 módulos da lista são aceitos individualmente.                                                                | Teste parametrizado |
+| RF2.CA6 | A lista de módulos é configurável e extensível sem alteração de lógica de validação.                                    | Revisão de código   |
+
+#### Vínculo com BD/DN e TAP
+
+&emsp;Este requisito resolve diretamente um gap identificado tanto pelo Blue Team (DN2 — "A validação de `destino` aceita qualquer string não vazia, sem conferir contra uma lista de módulos permitidos") quanto pelo Red Team (DN2 — "Não há validação semântica do campo `destino` contra uma lista de módulos fiscais reais da ASIS"). A ação corretiva foi registrada com prioridade média na seção 2.2.
+
+&emsp;Do ponto de vista do TAP, o parceiro espera "validação básica do payload de resposta" como parte do MVP. A aceitação de destinos inexistentes compromete a **correção funcional** do fluxo de auditoria e pode gerar processamento para módulos que não existem na plataforma ASIS, consumindo recursos sem resultado operacional.
+
+#### Como será evidenciado como código
+
+- **Implementação:** Constante `MODULOS_FISCAIS_VALIDOS` e validação _fail-fast_ em `src/core/api.py`, aplicada a todos os endpoints de auditoria.
+- **Testes Blue Team:** Cenários parametrizados para cada módulo válido, cenários de rejeição para módulos inválidos, validação de case-insensitivity e verificação de ausência de efeitos colaterais.
+- **Testes Red Team:** Tentativas de bypass por encoding (ex.: Unicode homoglyphs), injeção via campo `destino` e fuzzing de nomes de módulos.
+
+---
+
+## 3.2 Requisitos Não Funcionais
+
+### RNF1 — Eficiência de Desempenho: Capacidade (ISO 25010)
+
+**Característica ISO 25010:** Eficiência de Desempenho — Capacidade
+
+> _Capacidade: grau em que os limites máximos de um parâmetro de produto ou sistema atendem aos requisitos._ (ISO/IEC 25010:2023, 4.3.3)
+
+#### Descrição
+
+&emsp;O DN1 (Blue Team) validou a latência de ingestão sob condições normais, obtendo uma média de 373 ms e P90 bem abaixo do SLA de 500 ms. O DN1 (Red Team) testou cenários de estresse com carga extrema (até 720 requisições concorrentes) sem conseguir quebrar o SLA em ambiente local. Contudo, **nenhum dos testes estabeleceu formalmente o limite de capacidade do sistema** — ou seja, quantas requisições concorrentes a API suporta antes que a degradação de tempo de resposta ultrapasse limiares aceitáveis.
+
+&emsp;Este requisito formaliza a necessidade de medir e controlar a **capacidade** da API como atributo de qualidade distinto da latência pontual, estabelecendo limiares verificáveis por meio de testes automatizados.
+
+#### Especificação e Limiares
+
+| Métrica                  | Limiar                  | Descrição                                                                                                         |
+| :----------------------- | :---------------------- | :---------------------------------------------------------------------------------------------------------------- |
+| **Capacidade mínima**    | 50 req concorrentes     | A API deve processar pelo menos 50 requisições simultâneas sem falha (HTTP 5xx).                                  |
+| **Degradação aceitável** | P95 ≤ 600 ms sob 50 req | O percentil 95 do tempo de resposta sob carga de 50 requisições concorrentes não deve exceder 600 ms.             |
+| **Taxa de sucesso**      | ≥ 95% sob carga         | Pelo menos 95% das requisições concorrentes devem retornar HTTP 201 ou um código de controle esperado (429, 503). |
+| **Baseline**             | P95 ≤ 500 ms sem carga  | O percentil 95 sob carga unitária serve como referência para medir degradação.                                    |
+
+#### Critérios de Aceite
+
+| ID       | Critério                                                                    | Evidência                                                            |
+| :------- | :-------------------------------------------------------------------------- | :------------------------------------------------------------------- |
+| RNF1.CA1 | Sob carga de 50 requisições concorrentes, o P95 da latência ≤ 600 ms.       | Teste de capacidade automatizado com métricas (min, max, média, P95) |
+| RNF1.CA2 | Taxa de sucesso (HTTP 201 + códigos de controle) ≥ 95% sob carga de 50 req. | Contagem automatizada de status codes                                |
+| RNF1.CA3 | Zero respostas HTTP 500 (Internal Server Error) sob carga de 50 req.        | Asserção automatizada                                                |
+| RNF1.CA4 | Degradação de P95 entre carga unitária e 50 req concorrentes ≤ 40%.         | Comparação automatizada baseline vs. carga                           |
+
+#### Vínculo com BD/DN e TAP
+
+&emsp;O TAP exige "garantia rápida e contínua da funcionalidade, confiabilidade e estabilidade dos serviços". Enquanto o DN1 mede latência (tempo de comportamento), este RNF mede **capacidade** — atributo distinto na ISO 25010 que determina os limites operacionais do sistema. O Red Team (DN1) documentou que 720 requisições concorrentes em ambiente local não quebraram o SLA, mas não formalizou limiares de aceite. Este requisito preenche essa lacuna com critérios verificáveis e reprodutíveis.
+
+&emsp;A capacidade é pré-requisito para a decisão do parceiro sobre dimensionamento de infraestrutura e para futuros modelos de **auto-scaling** baseados em métricas de carga.
+
+#### Como será evidenciado como código
+
+- **Implementação:** Script de teste de capacidade em `src/tests/blue_team/` utilizando `threading` ou `asyncio` para gerar carga concorrente controlada.
+- **Métricas coletadas:** min, max, média, P95, taxa de sucesso, contagem por status code.
+- **Relatório:** Saída estruturada com comparação baseline vs. carga, incluindo percentual de degradação.
+- **Integração CI/CD:** O teste pode ser executado como gate de qualidade em pipeline, falhando se os limiares não forem atingidos.
+
+---
+
+### RNF2 — Segurança: Autenticidade (ISO 25010)
+
+**Característica ISO 25010:** Segurança — Autenticidade
+
+> _Autenticidade: grau em que a identidade de um sujeito ou recurso pode ser comprovada como sendo aquela reivindicada._ (ISO/IEC 25010:2023, 4.6.5)
+
+#### Descrição
+
+&emsp;O Red Team (DN4.R2) identificou que a API atual **não valida a autenticidade das credenciais** enviadas via `account-key` e `app-key`. Qualquer string arbitrária é aceita como credencial válida, permitindo que um atacante forje a identidade de outro cliente e realize transações em seu nome. Isso foi classificado como **FAIL** no teste de Header Impersonation (DN4.R2) e recomendado como ação corretiva de alta prioridade.
+
+&emsp;Este requisito formaliza a necessidade de **autenticação efetiva** nos endpoints protegidos, garantindo que apenas credenciais registradas e válidas sejam aceitas pelo sistema.
+
+#### Regras de Segurança
+
+**RNF2.1 — Rejeição de requisições sem credenciais**
+
+- Requisições a endpoints protegidos (`/api/v1/auditar`, `/api/v1/auditar/resilient`, `/api/v1/auditar/nr`, `/api/v1/processo/{tracking_id}`) sem headers `account-key` e `app-key` devem retornar HTTP 401 (Unauthorized).
+- A mensagem de erro deve ser genérica: `"Credenciais de autenticação ausentes"` — sem revelar quais headers são esperados.
+
+**RNF2.2 — Rejeição de credenciais inválidas**
+
+- Requisições com `account-key` ou `app-key` que não correspondem a uma conta registrada devem retornar HTTP 403 (Forbidden).
+- A mensagem de erro: `"Credenciais inválidas"` — sem distinguir se o erro é no account-key ou app-key.
+
+**RNF2.3 — Registro de credenciais válidas**
+
+- O sistema deve manter um registro de pares `(account-key, app-key)` válidos, configurável via constante ou variável de ambiente.
+- Para o escopo do mock, ao menos 2 pares de credenciais devem estar registrados para permitir testes de isolamento entre tenants.
+
+**RNF2.4 — Endpoint público isento**
+
+- O endpoint `GET /api/v1/health` permanece **público**, sem exigência de autenticação, conforme DN3.3.
+
+#### Critérios de Aceite
+
+| ID       | Critério                                                                 | Evidência           |
+| :------- | :----------------------------------------------------------------------- | :------------------ |
+| RNF2.CA1 | Requisição sem headers `account-key`/`app-key` retorna HTTP 401.         | Teste automatizado  |
+| RNF2.CA2 | Requisição com `account-key` inválido retorna HTTP 403.                  | Teste automatizado  |
+| RNF2.CA3 | Requisição com `app-key` inválido retorna HTTP 403.                      | Teste automatizado  |
+| RNF2.CA4 | Requisição com credenciais válidas é aceita normalmente (HTTP 201).      | Teste automatizado  |
+| RNF2.CA5 | `GET /api/v1/health` responde sem autenticação (HTTP 200).               | Teste automatizado  |
+| RNF2.CA6 | Credenciais de um tenant não permitem acesso a recursos de outro tenant. | Teste de isolamento |
+
+#### Vínculo com BD/DN e TAP
+
+&emsp;O TAP lista "Análise de qualidade, arquitetura e segurança" como parte do escopo macro e espera "implementação de ferramentas de análise de código para relatórios de segurança". O Red Team (DN4.R2 — Header Impersonation, status **FAIL**) demonstrou que a ausência de autenticação real compromete diretamente o mecanismo de não-repúdio (DN4): se qualquer agente pode forjar `account-key`, o campo `actor` no recibo digital perde significado.
+
+&emsp;Na ISO 25010, **autenticidade** é a subcaracterística de segurança que garante que a identidade reivindicada é legítima. Sem autenticidade, as demais subcaracterísticas de segurança (integridade, não-repúdio, confidencialidade) ficam comprometidas — é um pré-requisito transversal.
+
+#### Como é evidenciado como código
+
+- **Implementação:** Dependência FastAPI (`Depends`) em `src/core/api.py` com validação de autenticidade por par (`account-key`, `app-key`) registrado em `VALID_CREDENTIAL_PAIRS`.
+- **Comportamento de segurança:** Endpoints protegidos retornam HTTP `401` para credenciais ausentes e HTTP `403` para credenciais inválidas; `GET /api/v1/health` permanece público.
+- **Testes Blue Team:** Suíte `src/tests/blue_team/RNF2_authenticity_blue.py` cobrindo os critérios RNF2.CA1 a RNF2.CA6 (ausente, inválida, válida, endpoint público e isolamento entre tenants).
+- **Integração com DN4/RNF1:** O `actor` usado em não-repúdio e histórico passa a representar identidade autenticada, reforçando rastreabilidade e isolamento de acesso.
+
+#### Execução dos testes RNF2
+
+```bash
+# Executar suíte de autenticidade RNF2
+pytest src/tests/blue_team/RNF2_authenticity_blue.py -v
+```
+
+---
+
+### RNF3 — Manutenibilidade: Testabilidade (ISO 25010)
+
+**Característica ISO 25010:** Manutenibilidade — Testabilidade
+
+> _Testabilidade: grau de eficácia e eficiência com que critérios de teste podem ser estabelecidos para um sistema, produto ou componente e testes podem ser realizados para determinar se esses critérios foram atendidos._ (ISO/IEC 25010:2023, 4.7.5)
+
+#### Descrição
+
+&emsp;O TAP define como entregáveis: "Relatórios de cobertura e execução dos testes de API", "Relatório simples em HTML" e "Execução local e via linha de comando". Embora a suíte de testes atual cubra 100% dos cenários planejados para DN1–DN4 (Blue e Red Team), **não existe mecanismo automatizado para medir a cobertura de código** nem para gerar relatórios de execução em formato acessível (HTML). Isso impede a verificação objetiva de que a qualidade dos testes é adequada e dificulta a integração com esteiras de CI/CD.
+
+&emsp;Este requisito formaliza a necessidade de instrumentar a suíte de testes com **cobertura de código mensurável** e **relatórios de execução em HTML**, garantindo que a testabilidade do sistema seja verificável e comunicável ao parceiro.
+
+#### Especificação e Limiares
+
+| Métrica                   | Limiar                             | Descrição                                                                            |
+| :------------------------ | :--------------------------------- | :----------------------------------------------------------------------------------- |
+| **Cobertura de linhas**   | ≥ 80% em `src/core/`               | Percentual de linhas de código executadas durante os testes.                         |
+| **Cobertura de branches** | ≥ 70% em `src/core/`               | Percentual de caminhos de decisão (if/else) exercitados.                             |
+| **Relatório de execução** | HTML gerado automaticamente        | Cada execução de testes gera um relatório HTML com status, tempos e detalhes por DN. |
+| **Execução CLI**          | `pytest` sem dependências externas | Toda a suíte é executável via `pytest` em ambiente local, sem serviços externos.     |
+
+#### Critérios de Aceite
+
+| ID       | Critério                                                                                                              | Evidência                                 |
+| :------- | :-------------------------------------------------------------------------------------------------------------------- | :---------------------------------------- |
+| RNF3.CA1 | Execução de `pytest --cov=src/core --cov-report=html` gera relatório de cobertura em HTML.                            | Execução automatizada + artefato HTML     |
+| RNF3.CA2 | Cobertura de linhas em `src/core/` ≥ 80%.                                                                             | Relatório de cobertura                    |
+| RNF3.CA3 | Cobertura de branches em `src/core/` ≥ 70%.                                                                           | Relatório de cobertura com `--cov-branch` |
+| RNF3.CA4 | Execução de `pytest --html=report.html` gera relatório de execução com status por teste, duração e detalhes de falha. | Artefato HTML                             |
+| RNF3.CA5 | Toda a suíte (Blue + Red Team) é executável via um único comando `pytest` sem serviços externos.                      | Execução em ambiente limpo                |
+| RNF3.CA6 | O relatório de cobertura é integrável com esteira de CI/CD (formato compatível com GitHub Actions / GitLab CI).       | Configuração de pipeline                  |
+
+#### Vínculo com BD/DN e TAP
+
+&emsp;O TAP define explicitamente como MVP: "Relatório simples em HTML" e "Execução local e via linha de comando". Como entregável: "Relatórios de cobertura e execução dos testes de API" e "Integração ao processo de CI/CD (desejável)". Este requisito traduz essas expectativas em critérios verificáveis e mensuráveis.
+
+&emsp;Na ISO 25010, **testabilidade** é subcaracterística de manutenibilidade que determina a facilidade com que o sistema pode ser testado. Um sistema com alta testabilidade permite que novos módulos sejam adicionados com confiança de que regressões serão detectadas — alinhado diretamente com o driver do TAP de "maior velocidade e confiança no deploy de novas funcionalidades" e com a meta de "replicação do modelo para demais módulos até atingir 100% de cobertura".
+
+#### Como será evidenciado como código
+
+- **Dependências adicionais:** `pytest-cov` (cobertura de código) e `pytest-html` (relatório de execução) a serem incluídos no `requirements.txt`.
+- **Comandos de execução:**
+
+```bash
+# Relatório de cobertura em HTML
+pytest --cov=src/core --cov-report=html --cov-branch
+
+# Relatório de execução em HTML
+pytest --html=report.html --self-contained-html -v
+
+# Combinado (cobertura + execução)
+pytest --cov=src/core --cov-report=html --cov-branch --html=report.html --self-contained-html -v
+```
+
+- **Integração CI/CD:** Configuração de pipeline (GitHub Actions ou equivalente) que executa a suíte, coleta cobertura e publica relatórios como artefatos de build.
+- **Gate de qualidade:** O pipeline pode ser configurado para falhar se a cobertura ficar abaixo dos limiares definidos (`--cov-fail-under=80`).
+
+---
+
+## 3.3 RNF — Verificação de Não-Repúdio a partir de Reclamação de Cliente
+
+### Definição do Requisito
+
+### Definição do Requisito
+
+**RNF1:** _Testar o alerta não-repúdio a partir de uma reclamação de cliente por transação alegada como não efetuada no dia anterior. Verificar se a transação está dentro da sazonalidade de valor, recorrência e data._
+
+&emsp;Este requisito não funcional endereça um cenário crítico de negócio para a ASIS TaxTech: quando um cliente contesta uma transação de auditoria fiscal alegando que não a realizou, o sistema deve ser capaz de **analisar automaticamente** se a transação contestada está dentro dos **padrões históricos do cliente** em três dimensões:
+
+1. **Sazonalidade de Valor**: o valor da transação está dentro do intervalo estatístico do histórico do cliente (média ± 2σ)?
+2. **Sazonalidade de Recorrência**: o cliente já utilizou o mesmo módulo fiscal (destino) anteriormente?
+3. **Sazonalidade Temporal**: o horário da transação é compatível com a janela habitual de operação do cliente?
+
+&emsp;Com base nessas três análises, o sistema emite um **veredito consolidado** — `TRANSAÇÃO LEGÍTIMA`, `ALERTA NÃO-REPÚDIO` ou `INCONCLUSIVO` — acompanhado de alertas estruturados que subsidiam a equipe de suporte e compliance na resolução da disputa.
+
+### Especificação da API — Endpoint de Disputa
+
+**Endpoint:** `POST /api/v1/disputa/nr`
+
+&emsp;Recebe a reclamação do cliente e realiza a análise de sazonalidade sobre a transação contestada. Campos de entrada:
+
+- `tracking_id` _(obrigatório)_: UUID da transação contestada pelo cliente.
+- `motivo` _(obrigatório)_: Descrição da reclamação (ex: "Transação não reconhecida pelo cliente").
+- `data_reclamacao` _(opcional)_: Data/hora da reclamação em ISO 8601.
+
+**Headers obrigatórios:** `account-key`, `app-key`
+
+**Resposta completa:**
+
+```json
+{
+  "disputa": {
+    "tracking_id": "uuid-da-transacao-contestada",
+    "motivo": "Transação não reconhecida pelo cliente",
+    "data_reclamacao": "2026-02-13T10:00:00+00:00",
+    "reclamante_actor": "sha256-hex-do-reclamante",
+    "transacao_actor": "sha256-hex-do-ator-original",
+    "same_actor": true
+  },
+  "transacao_original": {
+    "tracking_id": "uuid",
+    "timestamp": "2026-02-12T14:30:00+00:00",
+    "payload": {
+      "sessao_cliente": "...",
+      "valor": 2500.0,
+      "destino": "EFD_ICMS_IPI"
+    },
+    "receipt_integrity": true,
+    "receipt_alert": null
+  },
+  "seasonality_analysis": {
+    "value": {
+      "analysis": "CONFORME",
+      "within_pattern": true,
+      "disputed_value": 2500.0,
+      "historical_mean": 2512.5,
+      "historical_std_dev": 70.71,
+      "acceptable_range": { "lower": 2371.08, "upper": 2653.92 },
+      "sample_size": 5
+    },
+    "recurrence": {
+      "analysis": "CONFORME",
+      "within_pattern": true,
+      "disputed_destination": "EFD_ICMS_IPI",
+      "historical_occurrences": 5,
+      "total_transactions": 5,
+      "frequency_percent": 100.0
+    },
+    "temporal": {
+      "analysis": "CONFORME",
+      "within_pattern": true,
+      "disputed_hour": 14,
+      "historical_mean_hour": 14.2,
+      "acceptable_window": { "lower_hour": 10.2, "upper_hour": 18.2 },
+      "sample_size": 5
+    }
+  },
+  "verdict": {
+    "verdict": "TRANSAÇÃO LEGÍTIMA",
+    "confidence": "ALTA",
+    "reason": "Transação dentro do padrão histórico em 3/3 dimensões analisadas",
+    "anomalies_detected": 0,
+    "conformities_detected": 3,
+    "insufficient_data": 0,
+    "alert": null
+  },
+  "alert": null,
+  "analysis_timestamp": "2026-02-13T10:05:00+00:00"
+}
+```
+
+**Endpoint auxiliar:**
+
+- `GET /api/v1/historico/{actor_hash}` — Retorna o histórico de transações de um ator para análise de sazonalidade (acesso restrito ao próprio ator).
+
+### Mapa de Direcionadores — RNF1
+
+&emsp;Foram implementados 7 direcionadores que compõem a estrutura de aferição do RNF1:
+
+| ID         | Direcionador                         | SLA / Critério de Aceite                                                                                                                                                 | Status   |
+| :--------- | :----------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
+| **RNF1.1** | **Sazonalidade de Valor**            | Análise estatística (média ± 2σ) sobre o histórico do cliente. Valores dentro do intervalo → CONFORME; fora → ANOMALO; < 2 transações → INSUFICIENTE.                    | **PASS** |
+| **RNF1.2** | **Sazonalidade de Recorrência**      | Verificação de destino (módulo fiscal) no histórico. Destino já utilizado → CONFORME; nunca utilizado → ANOMALO.                                                         | **PASS** |
+| **RNF1.3** | **Sazonalidade Temporal**            | Análise de janela horária habitual (média ± 4h). Horário compatível → CONFORME; fora da janela → ANOMALO; < 2 registros → INSUFICIENTE.                                  | **PASS** |
+| **RNF1.4** | **Veredito Consolidado**             | Combinação das 3 análises: todas CONFORME → LEGÍTIMA (ALTA); ≥1 ANOMALO → ALERTA (MÉDIA/ALTA); todas INSUFICIENTE → INCONCLUSIVO (BAIXA).                                | **PASS** |
+| **RNF1.5** | **Emissão de Alerta de Não-Repúdio** | Alerta estruturado emitido para disputas com anomalias ou dados insuficientes. Transações legítimas → sem alerta (None).                                                 | **PASS** |
+| **RNF1.6** | **Integridade do Recibo Original**   | Na disputa, o recibo digital da transação original é verificado quanto à integridade dos campos obrigatórios.                                                            | **PASS** |
+| **RNF1.7** | **Contrato do Endpoint de Disputa**  | `POST /api/v1/disputa/nr` retorna HTTP 200 com estrutura completa; HTTP 400 para campos ausentes; HTTP 404 para tracking_id inexistente; HTTP 422 para headers ausentes. | **PASS** |
+
+### Implementação Técnica — Motor de Sazonalidade
+
+**Módulo de sazonalidade e disputa (`src/core/api.py`):**
+
+```python
+# RNF1 — TransactionHistoryStore: histórico por ator para análise de sazonalidade
+class TransactionHistoryStore:
+    def record(self, actor, transaction): ...    # Registra transação no histórico
+    def get_history(self, actor) -> list: ...     # Retorna histórico completo do ator
+    def get_transaction_by_tracking_id(self, tracking_id) -> dict: ...  # Busca global
+
+# RNF1 — SeasonalityAnalyzer: motor de análise estatística
+class SeasonalityAnalyzer:
+    # RNF1.1: Análise de valor (média ± 2σ)
+    @staticmethod
+    def analyze_value_seasonality(history, disputed_value) -> dict: ...
+
+    # RNF1.2: Análise de recorrência (destino habitual)
+    @staticmethod
+    def analyze_recurrence_seasonality(history, disputed_destination) -> dict: ...
+
+    # RNF1.3: Análise temporal (janela horária ± 4h)
+    @staticmethod
+    def analyze_temporal_seasonality(history, disputed_timestamp) -> dict: ...
+
+    # RNF1.4: Veredito consolidado (LEGÍTIMA / ALERTA / INCONCLUSIVO)
+    @staticmethod
+    def generate_dispute_verdict(value, recurrence, temporal) -> dict: ...
+
+# RNF1.5: Emissão de alerta
+def check_dispute_alert(verdict) -> Optional[str]: ...
+```
+
+**Integração com DN4 (Não-Repúdio):**
+
+&emsp;O endpoint `POST /api/v1/auditar/nr` foi estendido para registrar cada transação no `TransactionHistoryStore`, vinculando `tracking_id`, `payload`, `timestamp`, `actor` e `receipt`. Isso permite que o endpoint de disputa (`POST /api/v1/disputa/nr`) acesse o histórico completo do ator e a transação contestada com todas as evidências criptográficas de não-repúdio.
+
+### Metodologia de Testagem (Blue Team — TDD)
+
+&emsp;A aferição foi conduzida utilizando abordagem Test Data Driven (TDD) através do script `src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py`.
+
+&emsp;**Cada cenário de teste é executado 3 vezes** (iterações parametrizadas via `@pytest.mark.parametrize`) para garantir consistência e reprodutibilidade dos resultados.
+
+&emsp;**Massa de testes:** Os payloads simulam sessões reais de auditoria fiscal com valores variados (`PAYLOAD_VALIDO`: R$2.500,00 para EFD_ICMS_IPI; `PAYLOAD_VALOR_ANOMALO`: R$99.999,99 para MODULO_DESCONHECIDO), exercitando cenários de conformidade e anomalia.
+
+&emsp;**Versão da API testada:** v2.0.0 — `POST /api/v1/disputa/nr`
+
+**Estrutura dos testes (9 classes, 37 cenários × 3 iterações = 111 execuções):**
+
+| Classe de Teste                   | Cenários          | Direcionador |
+| :-------------------------------- | :---------------- | :----------- |
+| `TestRNF1SazonalidadeValor`       | 4 testes × 3 iter | RNF1.1       |
+| `TestRNF1SazonalidadeRecorrencia` | 3 testes × 3 iter | RNF1.2       |
+| `TestRNF1SazonalidadeTemporal`    | 4 testes × 3 iter | RNF1.3       |
+| `TestRNF1VereditoConsolidado`     | 5 testes × 3 iter | RNF1.4       |
+| `TestRNF1AlertaDisputa`           | 3 testes × 3 iter | RNF1.5       |
+| `TestRNF1IntegridadeRecibo`       | 2 testes × 3 iter | RNF1.6       |
+| `TestRNF1ContratoEndpoint`        | 6 testes × 3 iter | RNF1.7       |
+| `TestRNF1FluxoCompleto`           | 5 testes × 3 iter | E2E          |
+| `TestRNF1TransactionHistoryStore` | 5 testes × 3 iter | Unitário     |
+
+### Resultados Obtidos
+
+&emsp;A suíte de testes validou a implementação do RNF1 com os seguintes indicadores:
+
+- **Status Final:** APROVADO
+
+- **Taxa de Cobertura:** 100% (37 cenários × 3 iterações = 111 execuções passando)
+
+- **Cenários Testados:**
+  - 12 cenários de sazonalidade de valor (RNF1.1)
+  - 9 cenários de sazonalidade de recorrência (RNF1.2)
+  - 12 cenários de sazonalidade temporal (RNF1.3)
+  - 15 cenários de veredito consolidado (RNF1.4)
+  - 9 cenários de emissão de alerta (RNF1.5)
+  - 6 cenários de integridade de recibo (RNF1.6)
+  - 18 cenários de contrato do endpoint (RNF1.7)
+  - 15 cenários end-to-end (fluxo completo)
+  - 15 cenários unitários do TransactionHistoryStore
+
+- **Verificações de Negócio:**
+  - RNF1.1: Detecção de valor anômalo (média ± 2σ) → 4 testes
+  - RNF1.2: Detecção de destino não recorrente → 3 testes
+  - RNF1.3: Detecção de horário fora da janela habitual → 4 testes
+  - RNF1.4: Veredito correto para todos os cenários possíveis → 5 testes
+  - RNF1.5: Emissão de alerta apenas quando necessário → 3 testes
+  - RNF1.6: Integridade do recibo original verificada → 2 testes
+  - RNF1.7: Contrato do endpoint preservado → 6 testes
+  - E2E: Fluxo completo de disputa com análise → 5 testes
+  - Unitário: Armazenamento e busca no histórico → 5 testes
+
+### Execução dos Testes
+
+```bash
+# Instalar dependências
+pip install -r requirements.txt
+
+# Executar todos os testes RNF1 (Blue Team)
+pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py -v
+
+# Executar apenas testes de sazonalidade de valor
+pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1SazonalidadeValor -v
+
+# Executar apenas testes de sazonalidade de recorrência
+pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1SazonalidadeRecorrencia -v
+
+# Executar apenas testes de sazonalidade temporal
+pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1SazonalidadeTemporal -v
+
+# Executar apenas testes de veredito consolidado
+pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1VereditoConsolidado -v
+
+# Executar apenas testes end-to-end
+pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1FluxoCompleto -v
+
+# Executar apenas testes de contrato do endpoint
+pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1ContratoEndpoint -v
+```
+
+### Decisão Arquitetural e Contexto de BD/DN
+
+&emsp;A implementação do RNF1 decorre de um risco de negócio central em auditoria fiscal: a necessidade de **resolução fundamentada de disputas** quando um cliente contesta uma transação. Sem análise automatizada de sazonalidade, a equipe de suporte da ASIS dependeria exclusivamente de investigação manual — processo lento, subjetivo e não escalável para o volume de transações fiscais processadas.
+
+&emsp;A escolha de **análise estatística multidimensional** (valor, recorrência, data) é uma decisão arquitetural que equilibra **precisão de detecção** com **simplicidade de implementação**. O uso de média ± 2σ para valores segue o princípio estatístico de intervalo de confiança de ~95%, capturando anomalias significativas sem gerar falsos positivos excessivos. A tolerância de ±4 horas na janela temporal é calibrada para acomodar variações operacionais normais do dia a dia.
+
+&emsp;A integração com o DN4 (Não-Repúdio) é estratégica: ao vincular a análise de sazonalidade ao recibo digital e à cadeia de hash do log de auditoria, o sistema fornece não apenas uma análise comportamental, mas também **evidência criptográfica irrefutável** de que a transação ocorreu — combinando dois pilares de confiabilidade (padrão comportamental + prova criptográfica) em uma única resposta.
+
+&emsp;O `TransactionHistoryStore` foi projetado como armazenamento em memória por ator (thread-safe), seguindo o padrão arquitetural já estabelecido pelos demais componentes do sistema (rate limiter, circuit breaker, audit log). Em produção, este componente seria substituído por persistência em banco de dados com índices otimizados para consultas por ator e por tracking_id.
+
+### Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados
+
+**Aspectos positivos:**
+
+- **Resolução automatizada de disputas:** O motor de sazonalidade fornece análise objetiva e reproduzível para disputas de não-repúdio, eliminando subjetividade e acelerando o atendimento ao cliente — essencial para operações de auditoria fiscal com alto volume.
+- **Análise multidimensional:** A combinação de três dimensões independentes (valor, recorrência, horário) reduz o risco de falsos positivos e fornece um veredito consolidado com nível de confiança, subsidiando decisões de compliance com evidências quantificáveis.
+- **Integração com cadeia criptográfica:** Ao verificar a integridade do recibo digital original durante a disputa, o sistema garante que a evidência de não-repúdio não foi adulterada entre o momento da transação e o da reclamação — fundamento jurídico e regulatório para resolução de disputas fiscais.
+- **Rastreabilidade completa:** A resposta da disputa inclui o payload original, o recibo, a identificação do ator, a análise de sazonalidade e o timestamp da análise, criando um registro completo e auditável do processo de resolução.
+- **Base para automação de compliance:** O veredito estruturado com nível de confiança e dimensões de anomalia cria fundação para futuros modelos de ML que possam aprender padrões de disputas legítimas vs. fraudulentas.
+- **Cobertura de teste completa (111 execuções):** A suíte parametrizada com 37 cenários × 3 iterações garante reprodutibilidade e consistência, cobrindo cenários de conformidade, anomalia, dados insuficientes, erros e fluxos end-to-end.
+
+**Aspectos negativos / fora do foco atual:**
+
+- O armazenamento do histórico é em memória, sem persistência entre reinicializações — em produção, seria necessário banco de dados com retenção temporal configurável.
+- A análise de sazonalidade temporal pode ser imprecisa se todas as transações do histórico ocorrerem na mesma hora (desvio padrão temporal zero).
+- Não há limite de tamanho para o histórico por ator, o que pode consumir memória significativa em cenários com muitas transações por cliente.
+- A análise de recorrência considera apenas o destino (módulo fiscal) como critério — em produção, seria recomendável incluir combinações de destino + faixa de valor como padrão de recorrência.
+- O endpoint de disputa não implementa rate limiting próprio, o que poderia permitir abuso por volume de consultas de disputa.
+
+**Justificativa de priorização:** O RNF1 foi implementado como extensão natural do DN4 (Não-Repúdio), completando a cadeia de confiabilidade: o DN4 garante que a transação é **irrefutável** (evidência criptográfica), e o RNF1 verifica se a transação é **plausível** (análise comportamental). Limitações de tempo impediram a implementação de persistência real e limites de tamanho do histórico, ficando como recomendações para evolução futura.
