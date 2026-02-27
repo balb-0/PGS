@@ -42,6 +42,42 @@ VALID_CREDENTIAL_PAIRS = {
     ("red-team-target", "attack-vector-dn3"),
 }
 
+# =============================================================================
+# RF2 — Validação de Módulos Fiscais de Destino
+# =============================================================================
+
+MODULOS_FISCAIS_VALIDOS = {
+    "EFD_ICMS_IPI",
+    "EFD_CONTRIBUICOES",
+    "NCM_AUDIT",
+    "ECF",
+    "SPED_FISCAL",
+}
+
+
+def validar_destino(modulo_fiscal: str) -> str:
+    """
+    RF2 — Valida o campo destino contra a lista de modulos fiscais validos.
+
+    - Validação case-insensitive.
+    - Lanca HTTP 400 quando o modulo e invalido.
+    - Retorna o valor normalizado em uppercase quando valido.
+    """
+    if not isinstance(modulo_fiscal, str):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Modulo fiscal de destino invalido. Modulos aceitos: {sorted(MODULOS_FISCAIS_VALIDOS)}",
+        )
+
+    destino_normalizado = modulo_fiscal.upper()
+    if destino_normalizado not in MODULOS_FISCAIS_VALIDOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Modulo fiscal de destino invalido. Modulos aceitos: {sorted(MODULOS_FISCAIS_VALIDOS)}",
+        )
+
+    return destino_normalizado
+
 
 def authenticate_request(
     account_key: Optional[str] = Header(default=None),
@@ -119,6 +155,76 @@ CIRCUIT_BREAKER_RECOVERY_SECONDS = 30.0
 # Chave secreta para HMAC — em produção, viria de variável de ambiente
 NR_SECRET_KEY = "ASIS_TAXTECH_G06_NR_SECRET_2026"
 ALERT_THRESHOLD_PERCENT = 0.30
+
+
+# =============================================================================
+# RF1 — Store de Processos Assíncronos
+# =============================================================================
+
+
+class ProcessStatus(str, Enum):
+    PENDENTE = "pendente"
+    PROCESSANDO = "processando"
+    CONCLUIDO = "concluido"
+    ERRO = "erro"
+
+
+class ProcessStore:
+    """
+    RF1 — Store em memória para rastrear o status de processamento
+    assíncrono de cada tracking_id.
+    """
+
+    def __init__(self) -> None:
+        self._processes: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()
+
+    def record_process(
+        self,
+        tracking_id: str,
+        sessao_cliente: str,
+        destino: str,
+        valor: float,
+        status: ProcessStatus = ProcessStatus.CONCLUIDO,
+    ) -> None:
+        now = generate_timestamp()
+        with self._lock:
+            self._processes[tracking_id] = {
+                "tracking_id": tracking_id,
+                "status": status.value,
+                "sessao_cliente": sessao_cliente,
+                "destino": destino,
+                "valor": valor,
+                "submitted_at": now,
+                "updated_at": now,
+                "resultado": None,
+                "erro_detalhes": None,
+            }
+
+    def get(self, tracking_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            return self._processes.get(tracking_id)
+
+    def update_status(
+        self,
+        tracking_id: str,
+        status: ProcessStatus,
+        resultado: Optional[Dict[str, Any]] = None,
+        erro_detalhes: Optional[str] = None,
+    ) -> None:
+        with self._lock:
+            proc = self._processes.get(tracking_id)
+            if not proc:
+                return
+            proc["status"] = status.value
+            proc["updated_at"] = generate_timestamp()
+            if resultado is not None:
+                proc["resultado"] = resultado
+            if erro_detalhes is not None:
+                proc["erro_detalhes"] = erro_detalhes
+
+
+process_store = ProcessStore()
 
 # ───────────────────────────────────────────────────────────────────────────
 # DN3.1 — Rate Limiter (janela deslizante)
@@ -1224,6 +1330,9 @@ async def processar_auditoria(
     if not isinstance(volume_docs, (int, float)) or math.isnan(volume_docs) or math.isinf(volume_docs) or volume_docs <= 0 or volume_docs > 1e100:
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
 
+    # RF2: Validar módulo fiscal de destino (case-insensitive, fail-fast)
+    modulo_fiscal = validar_destino(modulo_fiscal)
+
     # DN2.5: Apenas após validação completa, iniciar processamento assíncrono
 
     # ATTEMPT REAL ASIS API COMUNICATON FIRST
@@ -1231,10 +1340,21 @@ async def processar_auditoria(
         # Chama a versão sincrona num executor para não bloquear o loop
         real_process_id = await asis_upload_file(auth["account_key"], auth["app_key"])
 
+        tracking_id = str(real_process_id)
+
+        # RF1: registrar processo como concluido na store
+        process_store.record_process(
+            tracking_id=tracking_id,
+            sessao_cliente=sessao,
+            destino=modulo_fiscal,
+            valor=volume_docs,
+            status=ProcessStatus.CONCLUIDO,
+        )
+
         return {
             "id": real_process_id,
             "status": 201,
-            "tracking_id": str(real_process_id),
+            "tracking_id": tracking_id,
             "arquivold": random.randint(22000, 23000),
             "diagnostico": "Conforme (Real API ASIS)",
             "detalhes": {
@@ -1251,10 +1371,20 @@ async def processar_auditoria(
         await asyncio.sleep(random.uniform(0.01, 0.1))
 
         # DN2.4: Gerar tracking_id apenas para payloads válidos (sem processamento em erro)
+        tracking_id = str(uuid.uuid4())
+
+        process_store.record_process(
+            tracking_id=tracking_id,
+            sessao_cliente=sessao,
+            destino=modulo_fiscal,
+            valor=volume_docs,
+            status=ProcessStatus.CONCLUIDO,
+        )
+
         return {
             "id": random.randint(20000, 30000),
             "status": 201,
-            "tracking_id": str(uuid.uuid4()),
+            "tracking_id": tracking_id,
             "arquivold": random.randint(22000, 23000),
             "diagnostico": "Conforme (Fallback Mock)",
             "detalhes": {
@@ -1345,6 +1475,9 @@ async def processar_auditoria_resiliente(
         circuit_breaker.record_failure()
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
 
+    # RF2: Validar módulo fiscal de destino (case-insensitive, fail-fast)
+    modulo_fiscal = validar_destino(modulo_fiscal)
+
     try:
         try:
             real_process_id = await asis_upload_file(account_key, app_key)
@@ -1388,6 +1521,15 @@ async def processar_auditoria_resiliente(
                 "alert": check_rate_limit_alert(rate_limiter, account_key),
             }
         }
+
+        # RF1: registrar processo como concluido na store
+        process_store.record_process(
+            tracking_id=tracking_id,
+            sessao_cliente=sessao,
+            destino=modulo_fiscal,
+            valor=volume_docs,
+            status=ProcessStatus.CONCLUIDO,
+        )
 
         circuit_breaker.record_success()
         health_checker.record_request(success=True)
@@ -1438,6 +1580,9 @@ async def processar_auditoria_nr(
 
     if not isinstance(volume_docs, (int, float)) or math.isnan(volume_docs) or math.isinf(volume_docs) or volume_docs <= 0 or volume_docs > 1e100:
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
+
+    # RF2: Validar módulo fiscal de destino (case-insensitive, fail-fast)
+    modulo_fiscal = validar_destino(modulo_fiscal)
 
     account_key = auth["account_key"]
     app_key = auth["app_key"]
@@ -1511,6 +1656,15 @@ async def processar_auditoria_nr(
         "log_position": log_entry["position"],
     }
     transaction_history.record(actor, transaction_record)
+
+    # RF1: registrar processo como concluido na store
+    process_store.record_process(
+        tracking_id=tracking_id,
+        sessao_cliente=sessao,
+        destino=modulo_fiscal,
+        valor=volume_docs,
+        status=ProcessStatus.CONCLUIDO,
+    )
 
     return {
         "id": transaction_id,
@@ -1727,3 +1881,30 @@ async def get_audit_log_entry(
     if entry is None:
         raise HTTPException(status_code=404, detail="Entrada não encontrada no log de auditoria")
     return entry
+
+
+# =============================================================================
+# RF1 — Endpoint de Consulta de Status de Processamento
+# =============================================================================
+
+
+@app.get("/api/v1/processo/{tracking_id}", status_code=200)
+async def consultar_processo(
+    tracking_id: str = Path(..., description="Tracking ID do processo de auditoria"),
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    """
+    RF1 — Consulta de Status de Processamento Assíncrono
+
+    Permite que o cliente consulte o status de processamento de um lote
+    previamente submetido via /api/v1/auditar ou variantes resilientes.
+    """
+    processo = process_store.get(tracking_id)
+
+    if processo is None:
+        raise HTTPException(status_code=404, detail="Processo não encontrado")
+
+    # Para o mock atual, não há isolamento por tenant aqui; a autenticação
+    # garante apenas que o chamador é um cliente valido.
+
+    return processo
