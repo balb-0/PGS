@@ -65,6 +65,13 @@
     - [Execução dos Testes](#execução-dos-testes-2)
     - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-3)
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-3)
+  - [1.5 Integração INT4 – Sincronismo de versões via API do GitLab](#15-integração-int4--sincronismo-de-versões-via-api-do-gitlab)
+    - [Assinatura / critério de versão](#assinatura--critério-de-versão)
+    - [Objetivo da integração](#objetivo-da-integração)
+    - [Requisitos e DNs relacionados](#requisitos-e-dns-relacionados)
+    - [Como se conectar ao serviço](#como-se-conectar-ao-serviço)
+    - [Função de verificação do protocolo](#função-de-verificação-do-protocolo)
+    - [Testes](#testes)
 - [2. Direcionadores Adversariais (Red Team)](#21-dn1-red-team---testes-adversariais-de-latência-sla)
   - [2.1 DN1 (Red Team) - Testes Adversariais de Latência (SLA)](#21-dn1-red-team---testes-adversariais-de-latência-sla)
     - [Objetivo do Ativo Adversarial](#objetivo-do-ativo-adversarial)
@@ -823,6 +830,96 @@ pytest src/tests/blue_team/non_repudiation.py::TestDN4ContratoAPI -v
 - O armazenamento do log é em memória, sem persistência entre reinicializações, o que limita a auditabilidade em cenários reais.
 
 **Justificativa de priorização:** O não-repúdio foi priorizado como quarto direcionador por completar a cadeia de confiabilidade: latência garante velocidade, integridade garante correção, disponibilidade garante acesso, e não-repúdio garante responsabilidade. Limitações de tempo e escopo impediram a implementação de autenticação forte real, anti-replay e persistência de log, ficando como recomendações para evolução — decisões tomadas conscientemente para entregar evidência funcional dos mecanismos criptográficos dentro do prazo.
+
+---
+
+## 1.5 Integração INT4 – Sincronismo de versões via API do GitLab
+
+**Sprint 3 – Tarefa 4.** Serviço de orquestração que utiliza a API do GitLab para verificar se a versão em produção corresponde à versão homologada (governança do SDLC).
+
+### Assinatura / critério de versão
+
+| Item | Valor |
+|------|--------|
+| **API** | GitLab REST API **v4** |
+| **Recurso** | Commit/Tag Sync (commits por branch) |
+| **Endpoint utilizado** | `GET /projects/:id/repository/commits?ref_name=<branch>&per_page=1` |
+| **Documentação oficial** | [GitLab Commits API](https://docs.gitlab.com/ee/api/commits.html#list-repository-commits) |
+
+### Objetivo da integração
+
+- Comparar automaticamente o **último commit da branch `main`** (produção) com o **último commit da branch `develop`** (homologação).
+- Retornar status **em sync** ou **out of sync**, permitindo auditoria e governança do ciclo de vida do software (SDLC).
+- Função **`verificar_protocolo_gitlab()`** confirma a conformidade do protocolo da integração (API v4 acessível e formato de resposta esperado), ou indica mudanças.
+
+### Requisitos e DNs relacionados
+
+- **Sprint 3 (INT4):** Verificar se a versão em Produção é a mesma homologada.
+- **Governança SDLC:** Rastreabilidade entre código homologado e código em produção.
+- **Documento de referência:** `docs/gestao-configuração.md` (política de branches: `main` = produção, `develop` = integração contínua).
+
+### Como se conectar ao serviço
+
+**1. Variáveis de ambiente**
+
+Configure na raiz do projeto (arquivo `.env`, **nunca** commitado):
+
+| Variável | Obrigatório | Descrição |
+|----------|-------------|-----------|
+| `GITLAB_PRIVATE_TOKEN` | Sim | Token de acesso (Personal Access Token ou Project Access Token) com permissão `read_api` e `read_repository`. |
+| `GITLAB_BASE_URL` | Não | Base URL do GitLab. Padrão: `https://git.inteli.edu.br`. |
+| `GITLAB_PROJECT_PATH` | Não | Path do projeto (ex.: `graduacao/2026-1a/t13/g06`). Padrão: repositório do projeto. |
+
+**2. Criação do token no GitLab**
+
+1. Acesse o GitLab (ex.: https://git.inteli.edu.br).
+2. **Settings** → **Access Tokens** (ou no projeto: **Settings** → **Access Tokens**).
+3. Crie um token com escopo **read_api** e **read_repository**.
+4. Copie o valor e defina em `GITLAB_PRIVATE_TOKEN` no `.env`.
+
+**3. Execução do script**
+
+Na raiz do repositório:
+
+```bash
+# Saída legível (status + commits)
+python scripts/verifica_versao_gitlab.py
+
+# Saída em JSON (para cron/automação)
+python scripts/verifica_versao_gitlab.py --json
+
+# Apenas verificação do protocolo da API (não compara commits)
+python scripts/verifica_versao_gitlab.py --apenas-protocolo
+```
+
+**Exit code:** `0` quando produção e homologação estão na mesma versão; `1` quando estão diferentes ou há erro.
+
+**4. Execução periódica (cron)**
+
+Exemplo para rodar a cada hora e registrar o resultado:
+
+```bash
+0 * * * * cd /caminho/para/repo && python scripts/verifica_versao_gitlab.py --json >> /var/log/gitlab_sync.log 2>&1
+```
+
+### Função de verificação do protocolo
+
+A função **`verificar_protocolo_gitlab()`** (em `scripts/verifica_versao_gitlab.py`):
+
+1. Chama `GET /projects/:id` para validar acesso ao projeto e que a API está respondendo.
+2. Chama `GET /projects/:id/repository/commits?ref_name=main&per_page=1` e valida que a resposta é uma lista de commits com campos `id` e `title`.
+
+Retorno: `{"ok": true/false, "message": "...", "details": {...}}`. Se `ok` for `false`, a mensagem indica token inválido, projeto não encontrado ou mudança no formato da API (protocolo).
+
+### Testes
+
+Testes de integração em `src/tests/blue_team/gitlab_sync_blue.py` que chamam a **API real do GitLab** (sem mock). É necessário ter `GITLAB_PRIVATE_TOKEN` válido no `.env` na raiz do projeto.
+
+```bash
+pytest src/tests/blue_team/gitlab_sync_blue.py -v
+```
+
+Os testes validam: estrutura do retorno de `verificar_protocolo_gitlab()`, obtenção do último commit das branches `main` e `develop`, comparação de sincronismo e serialização JSON. Se o token não estiver configurado (ou for um valor de teste), os testes são ignorados (`skip`).
 
 ---
 
