@@ -117,6 +117,15 @@
     - [Execução dos Testes](#execução-dos-testes-3)
     - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-4)
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-4)
+- [4. Integrações](#4-integrações)
+  - [4.1 Mapa de Integrações](#41-mapa-de-integrações)
+  - [4.2 - INT2: Locust](#42---int2-locust)
+    - [Objetivo](#objetivo-int2)
+    - [Cenários de Teste (CEN-1 a CEN-5)](#cenários-de-teste-cen-1-a-cen-5)
+    - [Método de Teste](#método-de-teste)
+    - [Métricas Obtidas](#métricas-obtidas)
+    - [Relação com Business Drivers e Requisitos](#relação-com-business-drivers-e-requisitos)
+    - [Guia de Execução e Interpretação de Resultados](#guia-de-execução-e-interpretação-de-resultados)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -1840,3 +1849,252 @@ pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1Contrat
 - O endpoint de disputa não implementa rate limiting próprio, o que poderia permitir abuso por volume de consultas de disputa.
 
 **Justificativa de priorização:** O RNF1 foi implementado como extensão natural do DN4 (Não-Repúdio), completando a cadeia de confiabilidade: o DN4 garante que a transação é **irrefutável** (evidência criptográfica), e o RNF1 verifica se a transação é **plausível** (análise comportamental). Limitações de tempo impediram a implementação de persistência real e limites de tamanho do histórico, ficando como recomendações para evolução futura.
+
+# 4. Integrações
+
+&emsp;Esta seção documenta o mapa de integrações internas e externas da API de auditoria fiscal da ASIS TaxTech, com assinaturas de versão para garantir o sincronismo entre atualizações tecnológicas e de negócio. Cada integração possui uma função interna de verificação do protocolo, que ao ser acionada confirma a conformidade ou indica mudanças em relação à versão anterior.
+
+## 4.1 Mapa de Integrações
+
+| ID       | Integração                                           | Tipo     | Versão do Protocolo | Status                |
+| :------- | :--------------------------------------------------- | :------- | :------------------ | :-------------------- |
+| **INT1** | *A ser implementado*                                 | —        | —                   | Pendente              |
+| **INT2** | Testes de carga e estresse via Locust (DN1/DN3)      | Interna  | v1.0.0              | **Implementado** ✅    |
+| **INT3** | *A ser implementado*                                 | —        | —                   | Pendente              |
+| **INT4** | *A ser implementado*                                 | —        | —                   | Pendente              |
+| **INT5** | *A ser implementado*                                 | —        | —                   | Pendente              |
+
+&emsp;A INT2 (Locust) valida a qualidade da API sob condições de carga concorrente real via HTTP, complementando os testes unitários (Blue Team) e adversariais (Red Team) que utilizam `TestClient` in-process. As demais integrações serão implementadas por outros desenvolvedores da equipe.
+
+## 4.2 - INT2: Locust
+
+### Objetivo
+
+&emsp;A INT2 implementa uma suíte de **testes de carga e estresse** utilizando o framework [Locust](https://locust.io/) para validar os cenários definidos nos direcionadores de negócio **DN1 (Latência de Ingestão)** e **DN3 (Disponibilidade e Resiliência da API)** sob condições de carga concorrente real via HTTP.
+
+&emsp;Diferentemente dos testes Blue Team e Red Team existentes — que utilizam `TestClient` in-process (sem latência de rede) —, o Locust executa requisições HTTP reais contra a API em execução, expondo comportamentos que só se manifestam sob contenção de recursos, latência de rede e concorrência real entre múltiplos clientes simultâneos.
+
+**Objetivos específicos:**
+
+- Validar o SLA de latência DN1 (P90 ≤ 500ms) sob carga concorrente progressiva (10 → 50 → 100 usuários simultâneos)
+- Exercitar os mecanismos de resiliência DN3 (rate limiting, circuit breaker, idempotência, degradação graciosa) sob estresse real
+- Verificar periodicamente o contrato (protocolo) de cada endpoint da API, detectando mudanças de versão que possam quebrar integrações
+- Gerar métricas quantitativas (P50, P90, P99, RPS, taxa de falha) que alimentem decisões de dimensionamento de infraestrutura
+
+### Cenários de Teste (CEN-1 a CEN-5)
+
+&emsp;Dentro da INT2, o arquivo `src/locust.py` exercita **5 cenários internos** (nomeados CEN-x para evitar colisão com os identificadores INTx do mapa de integrações do projeto):
+
+| Cenário  | Alvo                                                 | Endpoint                         | Verificação                                        | DN Relacionado |
+| :------- | :--------------------------------------------------- | :------------------------------- | :------------------------------------------------- | :------------- |
+| **CEN-1** | Ingestão de auditoria fiscal                        | `POST /api/v1/auditar`           | SLA de latência (P90 ≤ 500ms), status 201          | DN1, DN2       |
+| **CEN-2** | Auditoria resiliente com controles de disponibilidade | `POST /api/v1/auditar/resilient` | Rate limiting, circuit breaker, idempotência        | DN3            |
+| **CEN-3** | Health check / monitoramento                         | `GET /api/v1/health`             | Status, uptime, taxa de erro, estado do circuito    | DN3.3          |
+| **CEN-4** | Protocolo de autenticação (account-key/app-key)      | Todos os endpoints autenticados  | 401/403 em credenciais ausentes/inválidas           | RNF2           |
+| **CEN-5** | Auditoria com não-repúdio                            | `POST /api/v1/auditar/nr`        | Integridade HMAC, cadeia de log de auditoria        | DN4            |
+
+&emsp;Cada cenário inclui uma **função de verificação de protocolo** que valida o contrato de resposta (campos esperados, códigos de status, estrutura) contra a versão documentada da API. Quando o contrato muda, a função emite alertas no log.
+
+### Método de Teste
+
+&emsp;A implementação utiliza o framework Locust com as seguintes classes de usuário:
+
+**1. `DN1LatencyUser` (CEN-1)** — Peso: 5
+
+&emsp;Simula usuários submetendo documentos fiscais para auditoria. Mede a latência de cada requisição e classifica como dentro/fora do SLA. Inclui três variantes de carga:
+- Payload padrão (EFD_ICMS_IPI, 3.200 documentos)
+- Payload alternativo (NCM_AUDIT, 8.100 documentos)
+- Payload pesado (SPED_FISCAL, 999.999 documentos)
+
+**2. `DN3ResilienceUser` (CEN-2, CEN-3)** — Peso: 3
+
+&emsp;Exercita os mecanismos de resiliência da API:
+- **Rate Limiting**: Rajadas rápidas de uma única conta para acionar o limite de 10 req/min
+- **Circuit Breaker**: Envio de payloads inválidos para acumular falhas e potencialmente abrir o circuito
+- **Idempotência**: Requisições duplicadas com mesma `idempotency-key` para validar replay
+- **Health Check**: Monitoramento contínuo do endpoint `/health` sob carga
+
+**3. `AuthValidationUser` (CEN-4)** — Peso: 1
+
+&emsp;Valida o protocolo de autenticação sob carga:
+- Requisições sem headers de autenticação (espera 401)
+- Credenciais inválidas (espera 403)
+- Headers parciais (espera 401)
+- Autenticação válida em endpoint resiliente
+- Health check sem autenticação (espera 200)
+
+**4. `IntegrationProtocolChecker` (CEN-5 + Sweep)** — Peso: 1
+
+&emsp;Foca no endpoint de não-repúdio (`/api/v1/auditar/nr`) e executa periodicamente uma varredura completa dos 5 cenários CEN para detectar desvios de protocolo.
+
+**Configuração de carga sugerida:**
+
+| Perfil       | Usuários | Spawn Rate | Duração | Objetivo                                  |
+| :----------- | :------- | :--------- | :------ | :---------------------------------------- |
+| Leve         | 10       | 2/s        | 60s     | Baseline funcional                        |
+| Moderado     | 50       | 10/s       | 120s    | Validação de SLA sob carga real           |
+| Estresse     | 100      | 20/s       | 180s    | Identificar ponto de ruptura              |
+| Sustentado   | 50       | 5/s        | 600s    | Detectar memory leaks e degradação lenta  |
+
+### Métricas Obtidas
+
+&emsp;O Locust coleta e reporta as seguintes métricas automaticamente:
+
+**Métricas de Latência (DN1):**
+
+| Métrica               | Descrição                                                                 |
+| :-------------------- | :------------------------------------------------------------------------ |
+| P50 (mediana)         | Tempo de resposta que 50% das requisições não excedem                     |
+| P90                   | Tempo de resposta que 90% das requisições não excedem — **SLA DN1: ≤ 500ms** |
+| P99                   | Tempo de resposta que 99% das requisições não excedem                     |
+| Média                 | Latência média de todas as requisições                                    |
+| Min / Max             | Extremos observados                                                       |
+| RPS                   | Requisições por segundo sustentadas                                       |
+
+**Métricas de Disponibilidade (DN3):**
+
+| Métrica                    | Descrição                                                             |
+| :------------------------- | :-------------------------------------------------------------------- |
+| Taxa de falha (%)          | Percentual de requisições com erro (4xx/5xx não esperados)            |
+| Rate limit triggers        | Quantidade de respostas 429 (Too Many Requests)                       |
+| Circuit breaker activations| Respostas 503 indicando circuit breaker aberto                        |
+| Health check latência      | Tempo de resposta do endpoint `/health` sob carga                     |
+| Conformidade SLA (%)       | Percentual de requisições dentro do limiar de 500ms                   |
+| Conformidade alerta (%)    | Percentual de requisições dentro do limiar de 650ms                   |
+
+**Métricas de Protocolo (Todas as CEN):**
+
+| Métrica                    | Descrição                                                             |
+| :------------------------- | :-------------------------------------------------------------------- |
+| Protocol mismatches        | Número de respostas que não correspondem ao contrato esperado         |
+| Version drift alerts       | Alertas emitidos quando campos obrigatórios estão ausentes            |
+
+### Relação com Business Drivers e Requisitos
+
+&emsp;A INT2 (Locust) se conecta diretamente aos direcionadores de negócio e requisitos do projeto:
+
+**DN1 — Latência de Ingestão:**
+
+- O SLA de P90 ≤ 500ms foi definido como critério de aceite do DN1 Blue Team
+- Os testes Red Team (DN1) já tentaram quebrar esse SLA com payloads pesados e rajadas, mas utilizaram `TestClient` in-process
+- O Locust complementa essa validação ao executar requisições HTTP reais, introduzindo latência de rede e contenção de recursos que não são capturadas in-process
+- As métricas P50/P90/P99 geradas pelo Locust fornecem dados para calibração de auto-scaling e dimensionamento de infraestrutura
+
+**DN3 — Disponibilidade e Resiliência:**
+
+- O DN3 Blue Team validou rate limiting, circuit breaker, health check, idempotência e degradação graciosa via testes unitários
+- O DN3 Red Team identificou pontos de quebra (DN3.R3 — sinalização de replay, DN3.R8 — crescimento do IdempotencyStore)
+- O Locust exercita esses mecanismos sob carga concorrente real, revelando condições de corrida (race conditions) e comportamentos que só se manifestam com múltiplos clientes simultâneos
+- A monitoração do health check sob carga valida se o endpoint de observabilidade permanece responsivo durante estresse
+
+**RNF2 — Autenticidade:**
+
+- O CEN-4 valida que o protocolo de autenticação (account-key/app-key) rejeita corretamente credenciais ausentes ou inválidas sob carga, prevenindo degradação da segurança por saturação
+
+**DN4 — Não-Repúdio:**
+
+- O CEN-5 valida o contrato do endpoint de não-repúdio sob carga, garantindo que os campos criptográficos (signature, receipt, audit log) permanecem consistentes e presentes
+
+**Verificação de Protocolo (Todas as INTx):**
+
+- A varredura periódica de protocolo (protocol sweep) implementa o requisito de "função interna de verificação da última mudança do protocolo da integração", conforme especificado nas diretrizes de controle de qualidade de integração como código
+
+### Guia de Execução e Interpretação de Resultados
+
+#### Pré-requisitos
+
+```bash
+# Instalar dependências (incluindo locust)
+pip install -r requirements.txt
+```
+
+#### Execução
+
+**1. Iniciar a API (Terminal 1):**
+
+```bash
+cd g06/src
+uvicorn core.api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**2. Executar Locust com Interface Web (Terminal 2):**
+
+```bash
+cd g06
+locust -f src/locust.py --host http://127.0.0.1:8000
+```
+
+&emsp;Acesse `http://localhost:8089` no navegador. Na interface web:
+- **Number of users**: quantidade total de usuários simultâneos (sugestão: começar com 10, aumentar para 50 e 100)
+- **Spawn rate**: quantos usuários iniciar por segundo (sugestão: 2-10)
+- **Host**: já preenchido via `--host`
+
+**3. Modo Headless (para CI/CD):**
+
+```bash
+cd g06
+locust -f src/locust.py --host http://127.0.0.1:8000 \
+    --headless -u 50 -r 10 --run-time 120s --csv results/locust
+```
+
+&emsp;Os resultados serão exportados em CSV para análise posterior.
+
+**4. Executar apenas cenários específicos (via tags):**
+
+```bash
+# Apenas testes de latência DN1
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-1
+
+# Apenas testes de resiliência DN3
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-2 CEN-3
+
+# Apenas testes de autenticação
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-4
+
+# Apenas testes de não-repúdio
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-5
+```
+
+#### Interpretação dos Resultados
+
+**Na Interface Web do Locust:**
+
+- **Statistics**: Tabela com métricas por endpoint — RPS, tempos de resposta (mediana, P90, P99), taxa de falha
+- **Charts**: Gráficos em tempo real de RPS, tempo de resposta e número de usuários
+- **Failures**: Lista de erros com frequência e mensagem — útil para identificar gargalos
+- **Download Data**: Exportar CSV para análise detalhada
+
+**No Terminal (ao encerrar):**
+
+&emsp;O Locust imprime um relatório INT2 resumido com:
+- Métricas por cenário (CEN-1 a CEN-5): contagem, min, max, média, P50, P90, P99
+- Conformidade SLA: percentual de requisições dentro do limiar de 500ms (DN1)
+- Conformidade de alerta: percentual dentro do limiar de 650ms
+- Veredito DN1: APROVADO se P90 ≤ 500ms, REPROVADO caso contrário
+- Métricas de health check DN3: latência média e P90 sob carga
+
+**Critérios de Aceite:**
+
+| Critério                                   | Limiar              | Status se violado |
+| :----------------------------------------- | :------------------ | :---------------- |
+| DN1 — Latência P90                         | ≤ 500ms             | REPROVADO         |
+| DN1 — Latência de alerta                   | ≤ 650ms (90% req)   | ALERTA            |
+| DN3 — Taxa de falha inesperada             | < 5%                | INVESTIGAR        |
+| DN3 — Health check responsivo              | P90 < 1000ms        | DEGRADADO         |
+| Protocolo — Mismatches em varredura        | 0                   | BREAKING CHANGE   |
+
+**Exemplo de saída esperada:**
+
+```
+[INFO] ======================================================================
+[INFO] INT2 — LOCUST STRESS TEST SUMMARY (DN1 / DN3)
+[INFO] ======================================================================
+[INFO]   CEN-1:auditar                  | n=1500   | mean=45.2ms | p50=38.0ms | p90=89.5ms | p99=210.3ms | SLA(P90<=500ms): PASS
+[INFO]                                  | min=12.1ms | max=450.2ms | SLA conformity=99.8% | Alert conformity=100.0%
+[INFO]   CEN-3:health                   | n=800    | mean=8.5ms  | p50=6.2ms  | p90=15.3ms | p99=42.1ms  | SLA(P90<=500ms): PASS
+[INFO]                                  | min=3.1ms  | max=85.4ms  | SLA conformity=100.0% | Alert conformity=100.0%
+[INFO] ======================================================================
+[INFO]   DN1 VERDICT: APROVADO (worst P90 = 89.5ms, SLA = 500ms)
+[INFO]   DN3 Health Check: mean=8.5ms, p90=15.3ms (n=800)
+[INFO] ======================================================================
+```
