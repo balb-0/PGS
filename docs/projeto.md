@@ -126,6 +126,7 @@
     - [Métricas Obtidas](#métricas-obtidas)
     - [Relação com Business Drivers e Requisitos](#relação-com-business-drivers-e-requisitos)
     - [Guia de Execução e Interpretação de Resultados](#guia-de-execução-e-interpretação-de-resultados)
+    - [Resultados Comparativos: 100 vs 1.000 Usuários Simultâneos](#resultados-comparativos-100-vs-1000-usuários-simultâneos)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -1852,21 +1853,9 @@ pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1Contrat
 
 # 4. Integrações
 
-&emsp;Esta seção documenta o mapa de integrações internas e externas da API de auditoria fiscal da ASIS TaxTech, com assinaturas de versão para garantir o sincronismo entre atualizações tecnológicas e de negócio. Cada integração possui uma função interna de verificação do protocolo, que ao ser acionada confirma a conformidade ou indica mudanças em relação à versão anterior.
-
-## 4.1 Mapa de Integrações
-
-| ID       | Integração                                           | Tipo     | Versão do Protocolo | Status                |
-| :------- | :--------------------------------------------------- | :------- | :------------------ | :-------------------- |
-| **INT1** | *A ser implementado*                                 | —        | —                   | Pendente              |
-| **INT2** | Testes de carga e estresse via Locust (DN1/DN3)      | Interna  | v1.0.0              | **Implementado** ✅    |
-| **INT3** | *A ser implementado*                                 | —        | —                   | Pendente              |
-| **INT4** | *A ser implementado*                                 | —        | —                   | Pendente              |
-| **INT5** | *A ser implementado*                                 | —        | —                   | Pendente              |
-
-&emsp;A INT2 (Locust) valida a qualidade da API sob condições de carga concorrente real via HTTP, complementando os testes unitários (Blue Team) e adversariais (Red Team) que utilizam `TestClient` in-process. As demais integrações serão implementadas por outros desenvolvedores da equipe.
 
 ## 4.2 - INT2: Locust
+&emsp;A INT2 (Locust) valida a qualidade da API sob condições de carga concorrente real via HTTP, complementando os testes unitários (Blue Team) e adversariais (Red Team) que utilizam `TestClient` in-process. 
 
 ### Objetivo
 
@@ -1876,7 +1865,7 @@ pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1Contrat
 
 **Objetivos específicos:**
 
-- Validar o SLA de latência DN1 (P90 ≤ 500ms) sob carga concorrente progressiva (10 → 50 → 100 usuários simultâneos)
+- Validar o SLA de latência DN1 (P90 ≤ 500ms) sob carga concorrente progressiva 
 - Exercitar os mecanismos de resiliência DN3 (rate limiting, circuit breaker, idempotência, degradação graciosa) sob estresse real
 - Verificar periodicamente o contrato (protocolo) de cada endpoint da API, detectando mudanças de versão que possam quebrar integrações
 - Gerar métricas quantitativas (P50, P90, P99, RPS, taxa de falha) que alimentem decisões de dimensionamento de infraestrutura
@@ -1927,14 +1916,6 @@ pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1Contrat
 
 &emsp;Foca no endpoint de não-repúdio (`/api/v1/auditar/nr`) e executa periodicamente uma varredura completa dos 5 cenários CEN para detectar desvios de protocolo.
 
-**Configuração de carga sugerida:**
-
-| Perfil       | Usuários | Spawn Rate | Duração | Objetivo                                  |
-| :----------- | :------- | :--------- | :------ | :---------------------------------------- |
-| Leve         | 10       | 2/s        | 60s     | Baseline funcional                        |
-| Moderado     | 50       | 10/s       | 120s    | Validação de SLA sob carga real           |
-| Estresse     | 100      | 20/s       | 180s    | Identificar ponto de ruptura              |
-| Sustentado   | 50       | 5/s        | 600s    | Detectar memory leaks e degradação lenta  |
 
 ### Métricas Obtidas
 
@@ -2013,14 +1994,12 @@ pip install -r requirements.txt
 **1. Iniciar a API (Terminal 1):**
 
 ```bash
-cd g06/src
 uvicorn core.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **2. Executar Locust com Interface Web (Terminal 2):**
 
 ```bash
-cd g06
 locust -f src/locust.py --host http://127.0.0.1:8000
 ```
 
@@ -2032,7 +2011,6 @@ locust -f src/locust.py --host http://127.0.0.1:8000
 **3. Modo Headless (para CI/CD):**
 
 ```bash
-cd g06
 locust -f src/locust.py --host http://127.0.0.1:8000 \
     --headless -u 50 -r 10 --run-time 120s --csv results/locust
 ```
@@ -2098,3 +2076,116 @@ locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-5
 [INFO]   DN3 Health Check: mean=8.5ms, p90=15.3ms (n=800)
 [INFO] ======================================================================
 ```
+
+### Resultados Comparativos: 100 vs 1.000 Usuários Simultâneos
+
+&emsp;Para avaliar o comportamento da API sob diferentes níveis de carga, foram executados dois testes de estresse com o Locust, ambos contra a mesma instância da API (`uvicorn` com 1 worker, `--host 127.0.0.1:8000`):
+
+| Parâmetro          | Teste 1 (Moderado) | Teste 2 (Estresse Extremo) |
+| :----------------- | :----------------- | :------------------------- |
+| **Usuários**       | 100                | 1.000                      |
+| **Spawn rate**     | 10/s               | 50/s                       |
+| **Distribuição**   | DN1=50, DN3=30, Auth=10, Protocol=10 | DN1=500, DN3=300, Auth=100, Protocol=100 |
+
+#### Dashboard Locust — 100 Usuários (spawn rate 10/s)
+
+![Dashboard Locust com 100 usuários — gráficos de RPS, tempo de resposta e número de usuários](img/locust_100users_charts.png)
+
+**Observações do gráfico (100 usuários):**
+
+- **RPS (Requests per Second):** estabiliza entre 80–100 req/s após todos os usuários serem criados, com a linha de falhas (vermelha) praticamente sobre o eixo zero
+- **Response Times:** P50 (mediana) permanece entre 15–25ms e P95 entre 120–150ms — ambos bem abaixo do SLA de 500ms
+- **Number of Users:** rampa linear de 0 → 100 em ~10 segundos, mantendo-se estável durante toda a execução
+
+#### Dashboard Locust — 1.000 Usuários (spawn rate 50/s)
+
+![Dashboard Locust com 1000 usuários — gráficos de RPS, tempo de resposta e número de usuários](img/locust_1000users_charts.png)
+
+**Observações do gráfico (1.000 usuários):**
+
+- **RPS:** cresce até ~350 req/s, porém a linha de falhas (vermelha) acompanha, atingindo ~80–100 falhas/s (~25% de taxa de erro)
+- **Response Times:** P50 escala de valores baixos até ~1.500ms e P95 dispara para ~8.000ms — ordens de grandeza acima do SLA
+- **Number of Users:** rampa de 0 → 1.000 em ~20 segundos; a degradação de latência começa a se manifestar a partir de ~400 usuários simultâneos
+
+#### Tabela Comparativa de Métricas
+
+| Métrica                        | 100 Usuários        | 1.000 Usuários        | Degradação    |
+| :----------------------------- | :------------------ | :-------------------- | :------------ |
+| **RPS sustentado**             | ~90 req/s           | ~350 req/s            | 3,9x (sublinear) |
+| **Taxa de falha**              | ~0%                 | ~16–25%               | Crítica       |
+| **Mediana (P50)**              | ~20ms               | ~620–1.500ms          | 30–75x        |
+| **P95**                        | ~130ms              | ~3.400–8.000ms        | 26–62x        |
+| **Latência máxima**            | ~2.200ms            | ~11.000ms             | 5x            |
+| **Falhas/s**                   | ~0                  | ~80–100               | —             |
+
+#### Análise por Cenário (CEN-1 a CEN-5)
+
+**CEN-1 — DN1 Latência (`POST /api/v1/auditar`):**
+
+| Métrica      | 100 Usuários  | 1.000 Usuários  | Veredicto |
+| :----------- | :------------ | :-------------- | :-------- |
+| Requisições  | ~3.100        | ~6.400          | —         |
+| Taxa de falha| ~39%          | ~55%            | REPROVADO |
+| Mediana      | 970ms         | 2.100ms         | REPROVADO |
+| P95          | ~2.000ms      | ~3.400ms        | REPROVADO |
+| Max          | 2.240ms       | 16.154ms        | REPROVADO |
+
+&emsp;O endpoint principal de auditoria é o mais impactado. Com 100 usuários a mediana já ultrapassa o SLA de 500ms (970ms), e com 1.000 usuários a situação se agrava drasticamente (2.100ms de mediana, 55% de falhas). **O SLA DN1 (P90 ≤ 500ms) é reprovado em ambos os cenários**, indicando que a API precisa de otimização (múltiplos workers, async I/O) para suportar carga concorrente real.
+
+**CEN-2/CEN-3 — DN3 Resiliência (`/api/v1/auditar/resilient` + `/health`):**
+
+| Métrica                    | 100 Usuários | 1.000 Usuários | Observação |
+| :------------------------- | :----------- | :------------- | :--------- |
+| Resilient — mediana        | 540ms        | 1.600ms        | 3x pior    |
+| Resilient — falhas         | 3,3%         | 5,1%           | Limítrofe  |
+| Rate-burst — mediana       | 480ms        | 1.600ms        | 3,3x pior  |
+| Rate-burst — falhas        | 0,7%         | 0,9%           | Estável   |
+| Idempotent replay — mediana| 390ms        | 1.500ms        | 3,8x pior  |
+| Health check — mediana     | 130ms        | 180ms          | Aceitável  |
+| Health check — falhas      | 3,3%         | 3,0%           | Estável   |
+
+&emsp;Os mecanismos de resiliência **continuam funcionais** mesmo sob carga extrema: o rate limiting rejeita rajadas corretamente (taxa de falha funcional estável em ~0,7–0,9%), e o health check permanece relativamente responsivo (mediana 130–180ms). Porém, a vantagem do cache de idempotência é anulada pela fila de rede — com 100 usuários o replay já é mais rápido (390ms vs 470ms), mas com 1.000 usuários ambos convergem para ~1.500ms.
+
+**CEN-4 — Autenticação:**
+
+| Teste             | 100 Usuários        | 1.000 Usuários       | Veredicto    |
+| :---------------- | :------------------ | :------------------- | :----------- |
+| Sem auth (401)    | 0% falhas, 580ms    | 0% falhas, 1.600ms  | APROVADO ✅   |
+| Auth inválida (403)| 0% falhas, 590ms   | 0% falhas, 2.000ms  | APROVADO ✅   |
+| Auth parcial (401)| 0% falhas, 620ms    | 0% falhas, 1.700ms  | APROVADO ✅   |
+
+&emsp;O protocolo de autenticação mantém **zero falhas funcionais** em ambos os cenários — todas as rejeições (401/403) ocorrem corretamente, independentemente da carga. A latência aumenta significativamente (3–4x), mas o comportamento de segurança é preservado.
+
+**CEN-5 — Não-Repúdio (`/api/v1/auditar/nr` + `/audit-log`):**
+
+| Métrica           | 100 Usuários     | 1.000 Usuários    | Veredicto    |
+| :---------------- | :--------------- | :---------------- | :----------- |
+| NR — mediana      | 1.100ms          | 2.400ms           | REPROVADO    |
+| NR — falhas       | 18,9%            | 12,1%             | REPROVADO    |
+| Audit-log — falhas| 20,3%            | 16,0%             | REPROVADO    |
+| NR — max          | 10.419ms         | 15.000ms          | REPROVADO    |
+
+&emsp;O endpoint de não-repúdio é computacionalmente intensivo (HMAC-SHA256 + cadeia de hash) e apresenta a pior degradação relativa. O cálculo criptográfico sequencial se torna um gargalo sob concorrência, e o audit-log que cresce a cada requisição torna a verificação da cadeia progressivamente mais lenta (O(n)).
+
+#### Diagnóstico: Causas-Raiz da Degradação
+
+&emsp;A análise comparativa revela 4 fatores principais:
+
+1. **Worker único do Uvicorn:** a API roda com 1 processo e 1 thread. O event loop satura com ~50+ conexões simultâneas. Solução: `uvicorn --workers 4` ou Gunicorn com workers Uvicorn.
+
+2. **Crescimento sublinear do RPS:** com 10x mais usuários (100 → 1.000), o throughput cresce apenas 3,9x (90 → 350 req/s), indicando saturação do servidor. O excedente vira fila TCP, inflando latências.
+
+3. **Audit log em memória:** o log de auditoria (`CEN-5`) cresce com cada requisição. A verificação de integridade da cadeia de hash tem complexidade O(n), degradando progressivamente.
+
+4. **Contenção de I/O síncrono:** operações criptográficas (HMAC, hash chain) executam de forma síncrona no event loop, bloqueando o processamento de outras requisições.
+
+#### Conclusão e Vereditos
+
+| Cenário               | 100 Usuários  | 1.000 Usuários | Recomendação |
+| :-------------------- | :------------ | :------------- | :----------- |
+| **DN1 SLA (P90≤500ms)** | **REPROVADO** | **REPROVADO** | Escalar para múltiplos workers; otimizar processamento |
+| **DN3 Resiliência**   | **APROVADO**  | **DEGRADADO**  | Rate limiting funcional; latência precisa de escala |
+| **CEN-4 Auth**        | **APROVADO**  | **APROVADO**   | Segurança robusta em qualquer carga |
+| **CEN-5 Não-Repúdio** | **REPROVADO** | **REPROVADO**  | Mover criptografia para thread pool; limitar tamanho do log |
+
+&emsp;O **ponto de ruptura funcional da API está entre 10 e 50 usuários concorrentes** em configuração single-worker. A partir de 100 usuários, o SLA de latência DN1 já é violado. Com 1.000 usuários, a degradação é generalizada, embora os mecanismos de segurança (autenticação) e resiliência funcional (rate limiting) permaneçam intactos — demonstrando que a arquitetura de proteção é sólida mesmo quando a capacidade computacional é insuficiente.
