@@ -1384,6 +1384,14 @@ async def processar_auditoria(
             status=ProcessStatus.CONCLUIDO,
         )
 
+        payload_sped_gerado = {
+            "versao": "v2026",
+            "cnpj_emissor": "00000000000191",
+            "competencia": datetime.now(timezone.utc).strftime("%Y-%m"),
+            "hash_lote": hashlib.sha256(f"{sessao}{volume_docs}{tracking_id}".encode()).hexdigest(),
+            "volume_transacoes": int(volume_docs)
+        }
+
         return {
             "id": random.randint(20000, 30000),
             "status": 201,
@@ -1394,7 +1402,8 @@ async def processar_auditoria(
                 "cliente": sessao,
                 "volume_processado": volume_docs,
                 "modulo": modulo_fiscal
-            }
+            },
+            "payload_sped_gerado": payload_sped_gerado
         }
 
 
