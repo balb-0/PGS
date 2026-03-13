@@ -138,6 +138,13 @@
     - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-5)
     - [Configuração de Variáveis de Ambiente](#configuração-de-variáveis-de-ambiente)
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-5)
+  - [4.4 INT4 — Sincronismo de versões via API do GitLab](#44-int4--sincronismo-de-versões-via-api-do-gitlab)
+    - [4.4.1 Assinatura / critério de versão](#441-assinatura--critério-de-versão)
+    - [4.4.2 Objetivo da integração](#442-objetivo-da-integração)
+    - [4.4.3 Requisitos e DNs relacionados](#443-requisitos-e-dns-relacionados)
+    - [4.4.4 Como se conectar ao serviço](#444-como-se-conectar-ao-serviço)
+    - [4.4.5 Função de verificação do protocolo](#445-função-de-verificação-do-protocolo)
+    - [4.4.6 Testes](#446-testes)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -2473,3 +2480,93 @@ CLERK_JWKS_URL=https://seu-dominio.clerk.accounts.dev/.well-known/jwks.json
 - Não foram implementados testes Red Team para INT3 (ex.: ataques de token replay, JWK confusion, algorithm confusion). Ficam como recomendação para a próxima sprint.
 
 **Justificativa de priorização:** A integração INT3 foi priorizada como primeira integração externa da sprint por ser pré-requisito para as demais: sem autenticidade real, os mecanismos de isolamento (DN4), não-repúdio e conformidade LGPD perdem fundamento. A escolha do Clerk em substituição ao Auth0 original decorre de menor complexidade de configuração inicial e SDK mais direto para validação JWT server-side em Python.
+
+---
+
+## 4.4 INT4 — Sincronismo de versões via API do GitLab
+
+**Sprint 3 – Tarefa 4.** Serviço de orquestração que utiliza a API do GitLab para verificar se a versão em produção corresponde à versão homologada (governança do SDLC).
+
+### 4.4.1 Assinatura / critério de versão
+
+| Item | Valor |
+|------|--------|
+| **API** | GitLab REST API **v4** |
+| **Recurso** | Commit/Tag Sync (commits por branch) |
+| **Endpoint utilizado** | `GET /projects/:id/repository/commits?ref_name=<branch>&per_page=1` |
+| **Documentação oficial** | [GitLab Commits API](https://docs.gitlab.com/ee/api/commits.html#list-repository-commits) |
+
+### 4.4.2 Objetivo da integração
+
+- Comparar automaticamente o **último commit da branch `main`** (produção) com o **último commit da branch `develop`** (homologação).
+- Retornar status **em sync** ou **out of sync**, permitindo auditoria e governança do ciclo de vida do software (SDLC).
+- Função **`verificar_protocolo_gitlab()`** confirma a conformidade do protocolo da integração (API v4 acessível e formato de resposta esperado), ou indica mudanças.
+
+### 4.4.3 Requisitos e DNs relacionados
+
+- **Sprint 3 (INT4):** Verificar se a versão em Produção é a mesma homologada.
+- **Governança SDLC:** Rastreabilidade entre código homologado e código em produção.
+- **Documento de referência:** `docs/gestao-configuração.md` (política de branches: `main` = produção, `develop` = integração contínua).
+
+### 4.4.4 Como se conectar ao serviço
+
+**1. Variáveis de ambiente**
+
+Configure na raiz do projeto (arquivo `.env`, **nunca** commitado):
+
+| Variável | Obrigatório | Descrição |
+|----------|-------------|-----------|
+| `GITLAB_PRIVATE_TOKEN` | Sim | Token de acesso (Personal Access Token ou Project Access Token) com permissão `read_api` e `read_repository`. |
+| `GITLAB_BASE_URL` | Não | Base URL do GitLab. Padrão: `https://git.inteli.edu.br`. |
+| `GITLAB_PROJECT_PATH` | Não | Path do projeto (ex.: `graduacao/2026-1a/t13/g06`). Padrão: repositório do projeto. |
+
+**2. Criação do token no GitLab**
+
+1. Acesse o GitLab (ex.: https://git.inteli.edu.br).
+2. **Settings** → **Access Tokens** (ou no projeto: **Settings** → **Access Tokens**).
+3. Crie um token com escopo **read_api** e **read_repository**.
+4. Copie o valor e defina em `GITLAB_PRIVATE_TOKEN` no `.env`.
+
+**3. Execução do script**
+
+Na raiz do repositório:
+
+```bash
+# Saída legível (status + commits)
+python scripts/verifica_versao_gitlab.py
+
+# Saída em JSON (para cron/automação)
+python scripts/verifica_versao_gitlab.py --json
+
+# Apenas verificação do protocolo da API (não compara commits)
+python scripts/verifica_versao_gitlab.py --apenas-protocolo
+```
+
+**Exit code:** `0` quando produção e homologação estão na mesma versão; `1` quando estão diferentes ou há erro.
+
+**4. Execução periódica (cron)**
+
+Exemplo para rodar a cada hora e registrar o resultado:
+
+```bash
+0 * * * * cd /caminho/para/repo && python scripts/verifica_versao_gitlab.py --json >> /var/log/gitlab_sync.log 2>&1
+```
+
+### 4.4.5 Função de verificação do protocolo
+
+A função **`verificar_protocolo_gitlab()`** (em `scripts/verifica_versao_gitlab.py`):
+
+1. Chama `GET /projects/:id` para validar acesso ao projeto e que a API está respondendo.
+2. Chama `GET /projects/:id/repository/commits?ref_name=main&per_page=1` e valida que a resposta é uma lista de commits com campos `id` e `title`.
+
+Retorno: `{"ok": true/false, "message": "...", "details": {...}}`. Se `ok` for `false`, a mensagem indica token inválido, projeto não encontrado ou mudança no formato da API (protocolo).
+
+### 4.4.6 Testes
+
+Testes de integração em `src/tests/blue_team/gitlab_sync_blue.py` que chamam a **API real do GitLab** (sem mock). É necessário ter `GITLAB_PRIVATE_TOKEN` válido no `.env` na raiz do projeto.
+
+```bash
+pytest src/tests/blue_team/gitlab_sync_blue.py -v
+```
+
+Os testes validam: estrutura do retorno de `verificar_protocolo_gitlab()`, obtenção do último commit das branches `main` e `develop`, comparação de sincronismo e serialização JSON. Se o token não estiver configurado (ou for um valor de teste), os testes são ignorados (`skip`).
