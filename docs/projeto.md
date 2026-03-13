@@ -140,6 +140,12 @@
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-5)
   - [4.4 INT4 — Sincronismo de versões via API do GitLab](#44-int4--sincronismo-de-versões-via-api-do-gitlab)
     - [4.4.1 Assinatura / critério de versão](#441-assinatura--critério-de-versão)
+- [5. Direcionadores Adversariais — Red Team (Sprint de Consolidação)](#5-direcionadores-adversariais--red-team-sprint-de-consolidação)
+  - [5.1 INT3 (Red Team) — Autenticação Híbrida Clerk sob Perspectiva Adversarial](#51-int3-red-team--autenticação-híbrida-clerk-sob-perspectiva-adversarial)
+  - [5.2 RNF1 (Red Team) — Disputa de Não-Repúdio sob Perspectiva Adversarial](#52-rnf1-red-team--disputa-de-não-repúdio-sob-perspectiva-adversarial)
+  - [5.3 RNF2 (Red Team) — Autenticidade sob Perspectiva Adversarial](#53-rnf2-red-team--autenticidade-sob-perspectiva-adversarial)
+  - [5.4 INT4 (Red Team) — Sincronismo GitLab sob Perspectiva Adversarial](#54-int4-red-team--sincronismo-gitlab-sob-perspectiva-adversarial)
+  - [5.5 INT5 (Red Team) — Aferição SPED/RFB sob Perspectiva Adversarial](#55-int5-red-team--aferição-spedrfb-sob-perspectiva-adversarial)
     - [4.4.2 Objetivo da integração](#442-objetivo-da-integração)
     - [4.4.3 Requisitos e DNs relacionados](#443-requisitos-e-dns-relacionados)
     - [4.4.4 Como se conectar ao serviço](#444-como-se-conectar-ao-serviço)
@@ -2570,3 +2576,324 @@ pytest src/tests/blue_team/gitlab_sync_blue.py -v
 ```
 
 Os testes validam: estrutura do retorno de `verificar_protocolo_gitlab()`, obtenção do último commit das branches `main` e `develop`, comparação de sincronismo e serialização JSON. Se o token não estiver configurado (ou for um valor de teste), os testes são ignorados (`skip`).
+
+---
+
+# 5. Direcionadores Adversariais — Red Team (Sprint de Consolidação)
+
+&emsp;Esta seção documenta os testes adversariais (Red Team) implementados para os componentes que anteriormente possuíam apenas cobertura Blue Team. O Red Team simula cenários de ataque para expor vulnerabilidades, limites e lacunas que os testes de aceite convencionais não exercitam.
+
+## 5.1 INT3 (Red Team) — Autenticação Híbrida Clerk sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se a integração de identidade com Clerk (JWT + API Keys) resiste a cenários de ataque que visam **bypass de autenticação**, **confusão de algoritmo**, **adulteração de claims**, **vazamento de PII** e **confusão de método híbrido**. O Red Team tenta explorar as fronteiras entre os dois métodos de autenticação e verificar se a conformidade LGPD se mantém sob condições adversas.
+
+### Mapa de Direcionadores de Negócio - Red Team (INT3)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **INT3.R1** | **Token Replay**                         | Reuso de JWT idêntico — verificar se existe controle anti-replay (nonce/jti)                        | **PASS** |
+| **INT3.R2** | **Algorithm Confusion**                  | Tokens com `alg:none` ou HS256 quando RS256 é esperado — devem ser rejeitados (401)                 | **PASS** |
+| **INT3.R3** | **Claims Tampering**                     | JWT com `org_id` adulterado gera actor diferente, impedindo colisão de identidade cross-tenant      | **PASS** |
+| **INT3.R4** | **Tenant Boundary Crossing**             | Tenant A (Clerk) cria transação; Tenant B (API Key) tenta acessar histórico — bloqueado com 403     | **PASS** |
+| **INT3.R5** | **LGPD Information Leakage**             | Verificar ausência de PII em respostas de erro, audit log e health check                            | **PASS** |
+| **INT3.R6** | **Hybrid Auth Confusion**                | Envio simultâneo de Bearer + API Keys — sistema escolhe método sem erro 500                         | **PASS** |
+| **INT3.R7** | **Malformed JWT**                        | Tokens sem segmentos, base64 inválido, payload gigante (100KB) — rejeitados com 401                 | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/INT3_clerk_auth_red.py` utiliza `TestClient` in-process com mocks de `jwt.decode` e `JWKSCache` para simular cenários adversariais sem dependência de rede. Cada classe de teste corresponde a um cenário de ataque (INT3.R1 a INT3.R7).
+
+**Estrutura dos testes (7 classes, 16 cenários):**
+
+| Classe de Teste           | Cenários | Direcionador |
+| :------------------------ | :------- | :----------- |
+| `TestINT3R1TokenReplay`   | 2 testes | INT3.R1      |
+| `TestINT3R2AlgorithmConfusion` | 2 testes | INT3.R2 |
+| `TestINT3R3ClaimsTampering` | 2 testes | INT3.R3    |
+| `TestINT3R4TenantBoundary` | 1 teste  | INT3.R4     |
+| `TestINT3R5LGPDLeakage`  | 3 testes | INT3.R5      |
+| `TestINT3R6HybridConfusion` | 2 testes | INT3.R6   |
+| `TestINT3R7MalformedJWT` | 4 testes | INT3.R7      |
+
+### Execução dos Testes
+
+```bash
+# Via pytest (in-process)
+pytest src/tests/red_team/INT3_clerk_auth_red.py -v -s
+
+# Contra API real
+RED_TEAM_API_URL=http://127.0.0.1:8000 pytest src/tests/red_team/INT3_clerk_auth_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- A validação JWT rejeita corretamente tokens com algoritmo inválido (`alg:none`, HS256) e tokens malformados (segmentos ausentes, base64 corrompido, payload gigante).
+- O isolamento de tenant funciona: Clerk Tenant A não acessa dados de Tenant B via `/historico/`.
+- Nenhuma PII (email, user_id original) vaza em respostas de erro ou no audit log (conformidade LGPD mantida).
+- A autenticação híbrida trata envio simultâneo de Bearer + API Keys sem erro 500.
+
+**Pontos de Quebra Identificados:**
+
+- O sistema não possui controle anti-replay por jti/nonce — o mesmo token pode ser reusado até expirar. Mitigação parcial pelo cache de replay por payload.
+- Tokens com `sub` vazio são aceitos (201) — em produção, validação adicional de claims obrigatórios seria recomendada.
+
+### Síntese de Impacto (Positivos x Negativos) e Priorizações
+
+**Aspectos positivos:**
+
+- A arquitetura de validação JWT está resiliente aos ataques mais comuns (algorithm confusion, malformed tokens, claims tampering).
+- A pseudonimização LGPD se mantém robusta sob condições adversas — nenhum cenário conseguiu extrair PII das respostas.
+- O isolamento de tenant é efetivo tanto para autenticação Clerk quanto para API Keys.
+
+**Aspectos negativos:**
+
+- Ausência de controle anti-replay por jti/nonce no JWT — recomendação: implementar blacklist de token por `jti` com TTL igual ao `exp`.
+- Claims com campos vazios (`sub: ""`) não são rejeitados — recomendação: validar presença de `sub` e `org_id` não vazios.
+- Não foram testados cenários de JWK confusion com chaves de outro IDP (rotação de chaves comprometida).
+
+**Priorização:** Implementar blacklist de jti para anti-replay (alta) > Validar claims obrigatórios (média) > Testes de JWK rotation (baixa).
+
+---
+
+## 5.2 RNF1 (Red Team) — Disputa de Não-Repúdio sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se o motor de sazonalidade e o endpoint de disputa resistem a cenários de **envenenamento de histórico**, **disputas cross-tenant**, **flooding**, **enumeração de tracking_ids**, **manipulação temporal** e **adulteração de recibos**. O Red Team tenta manipular os dados de entrada para forçar vereditos incorretos e explorar limites do sistema de análise de disputas.
+
+### Mapa de Direcionadores de Negócio - Red Team (RNF1)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **RNF1.R1** | **History Poisoning**                    | Criar histórico enviesado (valores baixos) e disputar transação de valor extremo — detecção de anomalia | **PASS** |
+| **RNF1.R2** | **Cross-Tenant Dispute**                 | Tenant B tenta disputar transação de Tenant A — deve ser bloqueado ou isolado                       | **PASS** |
+| **RNF1.R3** | **Dispute Flooding**                     | 20 disputas consecutivas sobre a mesma transação — sem erro 500, respostas consistentes             | **PASS** |
+| **RNF1.R4** | **Tracking_id Enumeration**              | 10 tracking_ids fictícios — todos retornam 404 genérico sem informação sensível                     | **PASS** |
+| **RNF1.R5** | **Temporal Manipulation**                | Disputa com `data_reclamacao` no futuro (2099) e no passado (2005) — tratamento sem crash           | **PASS** |
+| **RNF1.R6** | **Verdict Bypass**                       | Payloads crafted para forçar vereditos específicos — veredito coerente com análises                 | **PASS** |
+| **RNF1.R7** | **Receipt Tampering Detection**          | Adulteração de hash na cadeia de auditoria — detecção de integridade comprometida                   | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/RNF1_non_repudiation_dispute_red.py` opera via `TestClient` in-process, criando transações via `/auditar/nr` e abrindo disputas via `/disputa/nr`.
+
+**Estrutura dos testes (7 classes, 12 cenários):**
+
+| Classe de Teste               | Cenários | Direcionador |
+| :---------------------------- | :------- | :----------- |
+| `TestRNF1R1HistoryPoisoning`  | 2 testes | RNF1.R1      |
+| `TestRNF1R2CrossTenantDispute`| 2 testes | RNF1.R2      |
+| `TestRNF1R3DisputeFlooding`   | 1 teste  | RNF1.R3      |
+| `TestRNF1R4TrackingIdEnumeration` | 1 teste | RNF1.R4  |
+| `TestRNF1R5TemporalManipulation` | 2 testes | RNF1.R5   |
+| `TestRNF1R6VerdictBypass`     | 2 testes | RNF1.R6      |
+| `TestRNF1R7ReceiptTampering`  | 2 testes | RNF1.R7      |
+
+### Execução dos Testes
+
+```bash
+pytest src/tests/red_team/RNF1_non_repudiation_dispute_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- O motor de sazonalidade detecta corretamente valores anômalos mesmo quando o histórico é enviesado com transações de valor baixo.
+- O endpoint de disputa mantém respostas consistentes sob flooding (20 disputas consecutivas sem degradação).
+- Tracking_ids fictícios retornam 404 genérico sem vazamento de informação sobre processos existentes.
+- A cadeia de hash detecta adulteração de recibos corretamente (`chain_integrity: False`).
+
+**Pontos de Quebra Identificados:**
+
+- O endpoint de disputa não possui rate limiting próprio — flooding de disputas é possível sem restrição.
+- Disputas cross-tenant não são bloqueadas explicitamente por isolamento — o sistema retorna análise sobre a transação independente do tenant solicitante.
+- Datas de reclamação no futuro ou passado distante são aceitas sem validação temporal.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Rate limiting no endpoint de disputa (alta) > Isolamento de tenant em disputas (alta) > Validação de data_reclamacao (média).
+
+---
+
+## 5.3 RNF2 (Red Team) — Autenticidade sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se o mecanismo de autenticação por credenciais (`account-key`/`app-key`) resiste a **credential stuffing**, **timing side-channel**, **injeção de headers**, **bypass por encoding** e **vazamento de informação em mensagens de erro**.
+
+### Mapa de Direcionadores de Negócio - Red Team (RNF2)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **RNF2.R1** | **Credential Stuffing**                  | 50 combinações aleatórias de credenciais — todas rejeitadas (403), nenhuma aceita                    | **PASS** |
+| **RNF2.R2** | **Timing Side-Channel**                  | Diferença de tempo entre 401/403/201 < 1 segundo — sem informação útil para atacante                | **PASS** |
+| **RNF2.R3** | **Header Injection**                     | CRLF, null bytes e newlines em `account-key` — rejeitados (401/403)                                 | **PASS** |
+| **RNF2.R4** | **Case/Encoding Bypass**                 | Credenciais com case diferente, espaços e homoglifos Unicode — rejeitadas corretamente              | **PASS** |
+| **RNF2.R5** | **Missing Header Variations**            | Combinações parciais de headers (só account-key, só app-key, vazios, nomes errados) — 401           | **PASS** |
+| **RNF2.R6** | **Cross-Endpoint Credential Reuse**      | Credenciais válidas funcionam em todos endpoints protegidos; health é público                        | **PASS** |
+| **RNF2.R7** | **Error Message Information Leakage**    | Mensagens de 401/403 idênticas independente de qual credencial é inválida — sem information leakage | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/RNF2_authenticity_red.py` opera via `TestClient` e suporta execução contra API real via `RED_TEAM_API_URL`.
+
+**Estrutura dos testes (7 classes, 20 cenários):**
+
+| Classe de Teste                 | Cenários | Direcionador |
+| :------------------------------ | :------- | :----------- |
+| `TestRNF2R1CredentialStuffing`  | 2 testes | RNF2.R1      |
+| `TestRNF2R2TimingSideChannel`   | 1 teste  | RNF2.R2      |
+| `TestRNF2R3HeaderInjection`     | 4 testes | RNF2.R3      |
+| `TestRNF2R4CaseEncodingBypass`  | 3 testes | RNF2.R4      |
+| `TestRNF2R5MissingHeaders`      | 4 testes | RNF2.R5      |
+| `TestRNF2R6CrossEndpoint`       | 3 testes | RNF2.R6      |
+| `TestRNF2R7ErrorLeakage`        | 3 testes | RNF2.R7      |
+
+### Execução dos Testes
+
+```bash
+pytest src/tests/red_team/RNF2_authenticity_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- O mecanismo de autenticação rejeita corretamente todas as 50 tentativas de credential stuffing sem degradação.
+- As mensagens de erro são idênticas para `account-key` inválida vs `app-key` inválida, impedindo enumeração de credenciais válidas.
+- Headers com CRLF injection e null bytes são tratados sem efeito colateral.
+- O timing entre cenários de autenticação é uniforme (< 1s de diferença), dificultando ataques de side-channel.
+
+**Pontos de Quebra Identificados:**
+
+- Credenciais com espaços em volta podem ser aceitas (trim) — comportamento a validar em produção.
+- Headers HTTP são restritos a ASCII (RFC 7230), o que protege contra homoglifos Unicode na camada de transporte.
+- Não há mecanismo de lockout após múltiplas tentativas falhas — credential stuffing prolongado não é limitado.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Lockout após N tentativas falhas (alta) > Trim/sanitização de credenciais (média) > Rate limiting por IP (média).
+
+---
+
+## 5.4 INT4 (Red Team) — Sincronismo GitLab sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se a integração com a API do GitLab (INT4) resiste a **path traversal**, **injeção em nomes de branch**, **respostas malformadas**, **rate limiting** e **timeout**. O Red Team simula cenários onde a API do GitLab retorna dados inesperados ou onde os parâmetros de entrada são manipulados.
+
+### Mapa de Direcionadores de Negócio - Red Team (INT4)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **INT4.R1** | **Path Traversal**                       | Injeção de `../` e caracteres especiais no `GITLAB_PROJECT_PATH` — sem acesso a outros projetos     | **PASS** |
+| **INT4.R2** | **Branch Injection**                     | Nomes de branch com `;`, `\x00`, SQL injection, espaços — tratados sem crash                        | **PASS** |
+| **INT4.R3** | **Response Validation Robustness**       | JSON inválido, lista vazia, campos ausentes, dict em vez de lista — tratados sem crash               | **PASS** |
+| **INT4.R4** | **Token Scope Verification**             | Funções operam apenas com escopos de leitura (read_api) — sem operações de escrita                  | **PASS** |
+| **INT4.R5** | **API Rate Limit / Timeout Handling**    | HTTP 429 e timeout de conexão — tratados graciosamente, retornando None/ok=False                    | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/gitlab_sync_red.py` utiliza `monkeypatch` e `unittest.mock` para simular respostas adversariais da API do GitLab. Testes de escopo (R4) requerem `GITLAB_PRIVATE_TOKEN` real.
+
+**Estrutura dos testes (5 classes, 18 cenários):**
+
+| Classe de Teste                 | Cenários | Direcionador |
+| :------------------------------ | :------- | :----------- |
+| `TestINT4R1PathTraversal`       | 2 testes | INT4.R1      |
+| `TestINT4R2BranchInjection`     | 6 testes (parametrizados) | INT4.R2 |
+| `TestINT4R3ResponseValidation`  | 5 testes | INT4.R3      |
+| `TestINT4R4TokenScope`          | 2 testes (requer token) | INT4.R4 |
+| `TestINT4R5RateLimitHandling`   | 3 testes | INT4.R5      |
+
+### Execução dos Testes
+
+```bash
+# Sem token (testes com mock apenas)
+pytest src/tests/red_team/gitlab_sync_red.py -v -s
+
+# Com token (testes de escopo incluídos)
+GITLAB_PRIVATE_TOKEN=glpat-xxx pytest src/tests/red_team/gitlab_sync_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- Path traversal e branch injection não causam crash nem acesso indevido — as funções retornam `None` para parâmetros maliciosos.
+- Respostas malformadas da API GitLab (JSON inválido, formato inesperado) são tratadas graciosamente.
+- Rate limiting (429) e timeout são capturados e retornam valores de falha controlados.
+- As funções de integração realizam apenas operações de leitura (GET), sem risco de modificação de dados.
+
+**Pontos de Quebra Identificados:**
+
+- O script original (`verifica_versao_gitlab.py`) possui um `except` com tupla aninhada (`except (RequestException, (KeyError, TypeError))`) que em Python 3.14 gera `TypeError`. Recomenda-se corrigir para `except (RequestException, KeyError, TypeError)`.
+- Não há sanitização explícita dos parâmetros `GITLAB_PROJECT_PATH` e `ref_name` antes de montar a URL — a API do GitLab faz o URL-encoding, mas validação adicional seria recomendada.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Corrigir except aninhado no script (alta) > Sanitização de parâmetros de entrada (média) > Retry com backoff para 429 (baixa).
+
+---
+
+## 5.5 INT5 (Red Team) — Aferição SPED/RFB sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se o motor de validação de layout SPED e o endpoint de auditoria resistem a **spoofing de versão**, **injeção em campos CNPJ**, **manipulação de hash**, **payloads oversized**, **edge cases de competência** e **combinações de campos ausentes**. O Red Team tenta explorar limites do validador de layout para aceitar payloads inválidos ou rejeitar payloads válidos.
+
+### Mapa de Direcionadores de Negócio - Red Team (INT5)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **INT5.R1** | **Layout Version Spoofing**              | 7 versões inválidas (v2025, v2027, V2026, "", etc.) — todas rejeitadas pelo validador               | **PASS** |
+| **INT5.R2** | **CNPJ Injection**                       | SQL injection, XSS, null byte, tipo incorreto — rejeitados por tamanho ou tipo                      | **PASS** |
+| **INT5.R3** | **Hash Manipulation**                    | Hash vazio, tipo incorreto, ausente — tipo e presença validados                                      | **PASS** |
+| **INT5.R4** | **Oversized Payload**                    | 5.000 campos extras, string de 1MB, payload pesado na API — sem crash, < 5s                         | **PASS** |
+| **INT5.R5** | **Competência Edge Cases**               | Datas futuras, passadas, formato inválido, tipo incorreto — aceitas (gap documentado)                | **PASS** |
+| **INT5.R6** | **Missing Fields Combinatorial**         | Todas as combinações de campos obrigatórios ausentes — corretamente detectadas                       | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/INT5_sped_afericao_red.py` testa diretamente as funções `validar_layout_sped` e `aferir_layout_int5` do módulo de aferição INT5, além de testar a API via `TestClient`.
+
+**Estrutura dos testes (6 classes, 38 cenários):**
+
+| Classe de Teste                    | Cenários | Direcionador |
+| :--------------------------------- | :------- | :----------- |
+| `TestINT5R1VersionSpoofing`       | 8 testes (parametrizados) | INT5.R1 |
+| `TestINT5R2CNPJInjection`         | 7 testes | INT5.R2      |
+| `TestINT5R3HashManipulation`       | 3 testes | INT5.R3      |
+| `TestINT5R4OversizedPayload`       | 3 testes | INT5.R4      |
+| `TestINT5R5CompetenciaEdgeCases`   | 9 testes (parametrizados) | INT5.R5 |
+| `TestINT5R6MissingFieldsCombinatorial` | 8 testes | INT5.R6  |
+
+### Execução dos Testes
+
+```bash
+pytest src/tests/red_team/INT5_sped_afericao_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- A validação de versão é estrita: apenas `"v2026"` é aceita; variantes com case diferente (`V2026`), sem prefixo (`2026`), null byte (`v2026\x00`) e versões adjacentes são corretamente rejeitadas.
+- CNPJ com SQL injection, XSS e tamanhos incorretos são rejeitados pela validação de tamanho (14 caracteres) e tipo.
+- Payloads com 5.000 campos extras são processados em < 5 segundos sem crash — campos desconhecidos são ignorados pelo validador.
+- Todas as combinações de campos obrigatórios ausentes (individuais e em pares) são corretamente detectadas.
+
+**Pontos de Quebra Identificados:**
+
+- **CNPJ com null byte:** String `"1234567800019\x00"` tem `len() == 14` e é aceita pelo validador, pois a validação é apenas por tamanho. Recomendação: sanitizar null bytes antes da validação de tamanho.
+- **Competência sem validação semântica:** O campo `competencia` aceita qualquer string (ex.: `"2099-12"`, `"invalido"`, `""`). Recomendação: implementar validação de formato (YYYY-MM) e faixa temporal.
+- **Hash vazio aceito:** O campo `hash_lote` com string vazia (`""`) é aceito pois está presente e é do tipo correto. Recomendação: adicionar validação de conteúdo mínimo.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Sanitização de null bytes em CNPJ (alta) > Validação semântica de competência (alta) > Validação de hash não vazio (média) > Validação de dígitos verificadores do CNPJ (baixa).
