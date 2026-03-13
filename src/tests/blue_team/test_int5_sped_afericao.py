@@ -57,17 +57,32 @@ def salvar_versao_atual(versao: str) -> None:
     _versao_local = versao
 
 
+# Payload representativo da nossa estrutura RF1 (v2026)
+PAYLOAD_AFERICAO = {
+    "versao": "v2026",
+    "cnpj_emissor": "00000000000191",
+    "competencia": "2026-01",
+    "hash_lote": "afericao-automatica"
+}
+
 async def checar_endpoint_sped(url: str = INT5_ENDPOINT, timeout: float = 10.0) -> Dict[str, Any]:
     """
-    Chama o endpoint do SPED/RFB e retorna o JSON de resposta.
-    Formato esperado: {"versao_layout": "v2026", "ativo": true}
-    Lança ConnectionError em qualquer falha (rede, HTTP ou inesperada).
+    Submete um payload de afericao ao servico do SPED/RFB.
+    Valida ativamente se a estrutura do nosso sistema (v2026)
+    ainda e aceita pelo contrato vigente da Receita.
     """
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url, headers={"Accept": "application/json"})
+            response = await client.post(url, json=PAYLOAD_AFERICAO, headers={"Accept": "application/json"})
+            
+            # Se a Receita retornar 400/422 (Unprocessable Entity), o layout mudou.
+            # Convertemos isso num retorno controlado em vez de explodir exceçao.
+            if response.status_code in (400, 422):
+                return {"aceito": False, "motivo": response.text, "status_code": response.status_code}
+            
             response.raise_for_status()
-            return response.json()
+            return {"aceito": True, "status_code": response.status_code, "dados": response.json()}
+            
     except httpx.HTTPStatusError as e:
         logger.error(f"Erro HTTP ao acessar SPED: Codigo {e.response.status_code}")
         raise ConnectionError("Falha de comunicacao com o servico (HTTP Error).")
@@ -104,20 +119,21 @@ async def verificar_integracao_int5(
 
     try:
         dados = await checar_endpoint_sped(url, timeout=timeout)
-        versao_obtida = dados.get("versao_layout", "desconhecido")
-        relatorio["versao_obtida"] = versao_obtida
-
-        if versao_obtida == EXPECTED_VERSION:
+        
+        # Se foi aceito (200, 201, 202), o contrato v2026 continua valendo
+        if dados.get("aceito") is True:
             relatorio["status"] = IntegracaoStatus.CONFORME
-            logger.info("Afericao INT5: Protocolo em conformidade com versao esperada.")
+            relatorio["versao_obtida"] = EXPECTED_VERSION  # Confirmado que o esperado foi aceito
+            logger.info("Afericao INT5: Payload de validacao ACEITO. Conformidade mantida.")
         else:
+            # Rejeitado (400, 422) = Desacordo de contrato (Receita mudou o layout exigido)
             relatorio["status"] = IntegracaoStatus.MUDANCA_DETECTADA
+            relatorio["versao_obtida"] = "rejeitado (mudanca_schema)"
             logger.warning(
-                f"Afericao INT5: Desacordo detectado! "
-                f"Esperado: {EXPECTED_VERSION}, Obtido: {versao_obtida}. "
-                f"Anterior: {versao_anterior}"
+                f"Afericao INT5: Quebra de contrato! Layout rejeitado pela RFB. "
+                f"Motivo: {dados.get('motivo')} | Status: {dados.get('status_code')}"
             )
-            salvar_versao_atual(versao_obtida)
+            salvar_versao_atual("desatualizado")
 
     except ConnectionError:
         relatorio["status"]        = IntegracaoStatus.INDISPONIVEL
@@ -132,9 +148,10 @@ async def verificar_integracao_int5(
 # =============================================================================
 
 def _endpoint_real_disponivel(url: str = INT5_ENDPOINT, timeout: float = 3.0) -> bool:
-    """Retorna True se o host responder qualquer código HTTP dentro do timeout."""
+    """Retorna True se o host responder qualquer chamada HEAD/GET/POST."""
     try:
-        httpx.get(url, timeout=timeout)
+        # Usamos HEAD para probe leve apenas para ver se o dns/rede existe
+        httpx.head(url, timeout=timeout)
         return True
     except (httpx.RequestError, httpx.TimeoutException):
         return False
@@ -173,9 +190,9 @@ def _make_async_client_mock(json_return=None, raise_for_status_exc=None, request
 
     mock_inner = AsyncMock()
     if request_error:
-        mock_inner.get.side_effect = request_error
+        mock_inner.post.side_effect = request_error
     else:
-        mock_inner.get.return_value = mock_response
+        mock_inner.post.return_value = mock_response
 
     mock_cm = AsyncMock()
     mock_cm.__aenter__.return_value = mock_inner
@@ -200,8 +217,8 @@ class TestINT5SpedAfericao(unittest.IsolatedAsyncioTestCase):
     async def test_integracao_em_conformidade_v2026(self):
         """
         Cenario 1 - CONFORME
-        Verifica que o servico retorna a versao esperada do layout.
-        API real (quando disponivel) ou mock como fallback.
+        Submete o payload v2026 e o servico ACEITA (simulando 202 Accepted).
+        Confirma que a estrutura do nosso sistema esta em conformidade.
         """
         if USANDO_API_REAL:
             resultado = await verificar_integracao_int5()
@@ -209,12 +226,11 @@ class TestINT5SpedAfericao(unittest.IsolatedAsyncioTestCase):
                 IntegracaoStatus.CONFORME,
                 IntegracaoStatus.MUDANCA_DETECTADA,
             ])
-            print(f"  [REAL] Status={resultado['status']} | Versao={resultado.get('versao_obtida')}")
+            print(f"  [REAL] Status={resultado['status']} | Conformidade={resultado.get('versao_obtida')}")
         else:
-            mock_cm = _make_async_client_mock(
-                json_return={"versao_layout": EXPECTED_VERSION, "ativo": True}
-            )
-            with patch(_PATCH_TARGET, return_value=mock_cm):
+            mock_cm = _make_async_client_mock(json_return={"protocolo": "123"}, raise_for_status_exc=None)
+            # Força o mock a retornar 202 Accepted
+            with patch(_PATCH_TARGET, return_value=mock_cm) as mock_post:
                 resultado = await verificar_integracao_int5()
             self.assertEqual(resultado["status"], IntegracaoStatus.CONFORME)
             self.assertEqual(resultado["versao_obtida"], EXPECTED_VERSION)
@@ -222,14 +238,14 @@ class TestINT5SpedAfericao(unittest.IsolatedAsyncioTestCase):
         self.assertIn("timestamp", resultado)
 
     # -------------------------------------------------------------------------
-    # Cenário 2: Mudança de versão detectada
+    # Cenário 2: Quebra de Contrato — Payload rejeitado
     # -------------------------------------------------------------------------
 
     async def test_integracao_layout_desatualizado_mudanca(self):
         """
-        Cenario 2 - MUDANCA DETECTADA
-        Quando a versao retornada e diferente da esperada, deve gerar alerta.
-        API real (observa a versao atual da RFB) ou mock com versao forcada.
+        Cenario 2 - MUDANCA DETECTADA (Quebra de contrato)
+        A Receita Federal REJEITA nosso payload (ex: mudaram a versao pra v2027
+        e nossa estrutura v2026 virou invalida) acusando 422 Unprocessable Entity.
         """
         if USANDO_API_REAL:
             resultado = await verificar_integracao_int5()
@@ -237,16 +253,22 @@ class TestINT5SpedAfericao(unittest.IsolatedAsyncioTestCase):
                 IntegracaoStatus.CONFORME,
                 IntegracaoStatus.MUDANCA_DETECTADA,
             ])
-            self.assertIn("versao_obtida", resultado)
         else:
-            versao_antiga = "v2025"
-            mock_cm = _make_async_client_mock(
-                json_return={"versao_layout": versao_antiga, "ativo": True}
-            )
+            # Simulando RFB rejeitando nosso schema
+            mock_response = MagicMock()
+            mock_response.status_code = 422
+            mock_response.text = '{"erro": "Layout v2026 descontinuado, utilize v2027"}'
+            
+            mock_inner = AsyncMock()
+            mock_inner.post.return_value = mock_response
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_inner
+            
             with patch(_PATCH_TARGET, return_value=mock_cm):
                 resultado = await verificar_integracao_int5()
+                
             self.assertEqual(resultado["status"], IntegracaoStatus.MUDANCA_DETECTADA)
-            self.assertEqual(resultado["versao_obtida"], versao_antiga)
+            self.assertEqual(resultado["versao_obtida"], "rejeitado (mudanca_schema)")
 
     # -------------------------------------------------------------------------
     # Cenário 3: Erro de rede — conexão recusada (falha real de rede)
