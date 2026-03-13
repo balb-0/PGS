@@ -6,3 +6,6 @@ pytest-cov>=4.0.0
 pytest-html>=3.2.0
 httpx>=0.23.0
 python-dotenv>=1.0.0
+PyJWT[crypto]>=2.8.0
+python-jose[cryptography]>=3.3.0
+cryptography>=41.0.0
