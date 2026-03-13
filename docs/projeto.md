@@ -117,8 +117,7 @@
     - [Execução dos Testes](#execução-dos-testes-3)
     - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-4)
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-4)
-- [4. Integrações](#4-integrações)
-  - [4.1 Mapa de Integrações](#41-mapa-de-integrações)
+- [4. Integrações de Serviços (Sprint de Consolidação)](#4-integrações-de-serviços-sprint-de-consolidação)
   - [4.2 - INT2: Locust](#42---int2-locust)
     - [Objetivo](#objetivo-int2)
     - [Cenários de Teste (CEN-1 a CEN-5)](#cenários-de-teste-cen-1-a-cen-5)
@@ -127,6 +126,18 @@
     - [Relação com Business Drivers e Requisitos](#relação-com-business-drivers-e-requisitos)
     - [Guia de Execução e Interpretação de Resultados](#guia-de-execução-e-interpretação-de-resultados)
     - [Resultados Comparativos: 100 vs 1.000 Usuários Simultâneos](#resultados-comparativos-100-vs-1000-usuários-simultâneos)
+  - [4.3 INT3 (Blue Team) — Integração de Gestão de Identidade com Clerk](#43-int3-blue-team--integração-de-gestão-de-identidade-com-clerk)
+    - [Objetivo](#objetivo-3)
+    - [Regras de Negócio](#regras-de-negócio-2)
+    - [Especificação da API — Endpoint de Autenticação Híbrida](#especificação-da-api--endpoint-de-autenticação-híbrida)
+    - [Mapa de Direcionadores de Negócio — Blue Team (INT3)](#mapa-de-direcionadores-de-negócio--blue-team-int3)
+    - [Implementação Técnica](#implementação-técnica-2)
+    - [Metodologia de Testagem (Blue Team — TDD)](#metodologia-de-testagem-blue-team--tdd-3)
+    - [Resultados Obtidos](#resultados-obtidos-6)
+    - [Execução dos Testes](#execução-dos-testes-4)
+    - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-5)
+    - [Configuração de Variáveis de Ambiente](#configuração-de-variáveis-de-ambiente)
+    - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-5)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -1851,11 +1862,22 @@ pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1Contrat
 
 **Justificativa de priorização:** O RNF1 foi implementado como extensão natural do DN4 (Não-Repúdio), completando a cadeia de confiabilidade: o DN4 garante que a transação é **irrefutável** (evidência criptográfica), e o RNF1 verifica se a transação é **plausível** (análise comportamental). Limitações de tempo impediram a implementação de persistência real e limites de tamanho do histórico, ficando como recomendações para evolução futura.
 
-# 4. Integrações
+## 4. Integrações de Serviços (Sprint de Consolidação)
 
+&emsp;Esta seção documenta as integrações externas e internas implementadas para garantir que cada serviço da ASIS TaxTech possua mecanismo de validação de integridade, controle de versão e conformidade com os requisitos não funcionais de latência e segurança.
+
+| ID      | Serviço      | Tipo     | Assinatura/Critério de Versão          | Objetivo do Sincronismo                                        |
+| :------ | :----------- | :------- | :------------------------------------- | :------------------------------------------------------------- |
+| **INT1** | SonarQube   | Externa  | Quality Gate API v10.x                 | Bloquear pipelines de CI/CD com brechas de segurança (DN2).   |
+| **INT2** | Locust      | Interna  | SLA Performance Script v2.1            | Validar se a build sustenta o SLA de 500ms (DN1/RNF3).        |
+| **INT3** | Clerk       | Externa  | OpenID Connect / OAuth 2.0             | Garantir isolamento de contas (DN4) e conformidade LGPD.      |
+| **INT4** | GitLab API  | Externa  | REST API v4 (Commit/Tag Sync)          | Verificar se a versão em Produção é a mesma homologada.       |
+| **INT5** | RFB / SPED  | Externa  | Layout Fiscal Web Service (v2026)      | Garantir que o upload (RF1) segue as normas vigentes da Receita. |
+
+---
 
 ## 4.2 - INT2: Locust
-&emsp;A INT2 (Locust) valida a qualidade da API sob condições de carga concorrente real via HTTP, complementando os testes unitários (Blue Team) e adversariais (Red Team) que utilizam `TestClient` in-process. 
+&emsp;A INT2 (Locust) valida a qualidade da API sob condições de carga concorrente real via HTTP, complementando os testes unitários (Blue Team) e adversariais (Red Team) que utilizam `TestClient` in-process.
 
 ### Objetivo
 
@@ -2189,3 +2211,265 @@ locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-5
 | **CEN-5 Não-Repúdio** | **REPROVADO** | **REPROVADO**  | Mover criptografia para thread pool; limitar tamanho do log |
 
 &emsp;O **ponto de ruptura funcional da API está entre 10 e 50 usuários concorrentes** em configuração single-worker. A partir de 100 usuários, o SLA de latência DN1 já é violado. Com 1.000 usuários, a degradação é generalizada, embora os mecanismos de segurança (autenticação) e resiliência funcional (rate limiting) permaneçam intactos — demonstrando que a arquitetura de proteção é sólida mesmo quando a capacidade computacional é insuficiente.
+
+---
+
+## 4.3 INT3 (Blue Team) — Integração de Gestão de Identidade com Clerk
+
+### Objetivo
+
+Configurar o Clerk como Identity Provider (IDP) na aplicação, implementando autenticação híbrida em paralelo ao sistema existente de `account-key`/`app-key`. Este direcionador garante **isolamento de contas (DN4)** e assegura que o tratamento de dados de usuários esteja em total conformidade com a **LGPD** e padrões de segurança bancária.
+
+### Regras de Negócio
+
+**INT3.1 - Validação de Token JWT Clerk**
+
+- A API deve validar tokens JWT emitidos pelo Clerk usando JWKS (JSON Web Key Set) com algoritmo RS256
+- Tokens expirados retornam HTTP 401 com mensagem `"INT3: Token JWT expirado"`
+- Tokens com assinatura inválida retornam HTTP 401
+- Requisições sem nenhum método de autenticação retornam HTTP 401 com referência explícita a `INT3`
+
+**INT3.2 - Isolamento de Contas por Tenant (DN4)**
+
+- Cada organização Clerk (`org_id`) é mapeada como um tenant isolado
+- O `actor` de DN4 é derivado como `SHA-256(user_id:org_id)` para autenticação Clerk
+- Um usuário de `org_A` não deve acessar dados, histórico ou log de auditoria de `org_B`
+- O `tenant_id` é registrado em cada transação do `TransactionHistoryStore`
+
+**INT3.3 - Autenticação Híbrida (Retrocompatibilidade)**
+
+- O endpoint `POST /api/v1/auditar/clerk` aceita ambos os métodos de autenticação
+- Header `Authorization: Bearer <token>` → Clerk JWT (OpenID Connect / OAuth 2.0)
+- Headers `account-key` + `app-key` → API Keys legadas
+- A resposta normaliza a identidade em um formato único com `auth_type`, `tenant_id` e `actor`
+
+**INT3.4 - Conformidade LGPD (Pseudonimização)**
+
+- Dados pessoais (email, nome) não são armazenados nos logs de auditoria
+- O `user_id` original do Clerk não aparece em nenhuma resposta nem no `AuditLog`
+- O `actor` é sempre um hash SHA-256 irreversível (pseudonimização, art. 12 LGPD)
+- Apenas identificadores hasheados são persistidos no `TransactionHistoryStore`
+
+**INT3.5 - Cache de Chaves JWKS**
+
+- As chaves públicas do Clerk são cacheadas localmente com TTL de 1 hora
+- O cache evita chamadas de rede desnecessárias, garantindo SLA de 500ms (DN1/RNF3)
+- Falha na obtenção das chaves retorna HTTP 503
+
+### Especificação da API — Endpoint de Autenticação Híbrida
+
+**Endpoint principal:** `POST /api/v1/auditar/clerk`
+
+&emsp;Aceita os mesmos campos de entrada dos demais endpoints de auditoria:
+
+- `sessao_cliente`: Identificador único da sessão de auditoria.
+- `valor`: Volume de documentos fiscais submetidos no lote.
+- `destino`: Módulo fiscal de destino (ex: `EFD_ICMS_IPI`, `NCM_AUDIT`).
+
+**Headers aceitos (um dos dois métodos):**
+
+| Método          | Header(s)                                          | Padrão                      |
+| :-------------- | :------------------------------------------------- | :-------------------------- |
+| Clerk JWT       | `Authorization: Bearer <token>`                    | OpenID Connect / OAuth 2.0  |
+| API Keys legado | `account-key: <key>` + `app-key: <key>`            | Retrocompatibilidade        |
+
+**Resposta (HTTP 201):**
+
+```json
+{
+  "id": 25000,
+  "status": 201,
+  "tracking_id": "uuid-v4",
+  "arquivold": 22500,
+  "diagnostico": "Conforme (Fallback Mock)",
+  "detalhes": {
+    "cliente": "sessao-int3-01",
+    "volume_processado": 3200.0,
+    "modulo": "EFD_ICMS_IPI"
+  },
+  "identity": {
+    "auth_type": "clerk",
+    "tenant_id": "org_alpha",
+    "actor": "sha256-hex-irreversivel"
+  },
+  "non_repudiation": {
+    "signature": "hmac-sha256-hex",
+    "timestamp": "2026-03-12T22:00:00.000000+00:00",
+    "actor": "sha256-hex-irreversivel",
+    "receipt": {
+      "signature": "...",
+      "timestamp": "...",
+      "actor": "...",
+      "tracking_id": "...",
+      "payload_hash": "..."
+    },
+    "log_position": 0,
+    "log_entry_hash": "sha256-hex",
+    "alert": null,
+    "chain_alert": null
+  }
+}
+```
+
+### Mapa de Direcionadores de Negócio — Blue Team (INT3)
+
+&emsp;Foram implementados 5 direcionadores que garantem a integração completa de gestão de identidade:
+
+| ID          | Direcionador de Negócio                   | SLA / Critério de Aceite                                                                                          | Status   |
+| :---------- | :---------------------------------------- | :---------------------------------------------------------------------------------------------------------------- | :------- |
+| **INT3.1**  | **Validação JWT Clerk (JWKS/RS256)**       | 100% dos tokens válidos aceitos; expirados, inválidos e ausentes rejeitados com HTTP 401.                         | **PASS** |
+| **INT3.2**  | **Isolamento de Tenant (DN4)**             | `org_A` não acessa dados de `org_B`; actors distintos por organização; tenant_id no histórico.                    | **PASS** |
+| **INT3.3**  | **Autenticação Híbrida**                   | Clerk JWT e API Keys funcionam no mesmo endpoint; resposta normalizada com `auth_type`.                           | **PASS** |
+| **INT3.4**  | **Conformidade LGPD**                      | PII ausente em logs e respostas; actor = SHA-256(user_id:org_id); pseudonimização verificável.                    | **PASS** |
+| **INT3.5**  | **Integração com DN4 (Não-Repúdio)**       | Recibo digital completo em ambos os métodos; transação registrada com `tenant_id`; cadeia de hash íntegra.        | **PASS** |
+
+### Implementação Técnica
+
+**Módulo de autenticação Clerk (`src/core/auth_clerk.py`):**
+
+```python
+# INT3.1: Cache de JWKS com TTL (evita chamadas externas desnecessárias)
+class JWKSCache:
+    def get_keys(self) -> dict: ...      # Retorna chaves cacheadas ou busca remotamente
+    def invalidate(self):  ...           # Invalida o cache (testes e rotação de chaves)
+
+# INT3.1: Validação de token JWT usando JWKS do Clerk
+def verify_clerk_token(token: str) -> dict: ...
+    # Raises HTTPException 401 para token expirado ou inválido
+
+# INT3.4: Extração de identidade com pseudonimização (LGPD)
+def extract_clerk_identity(claims: dict) -> dict:
+    # Retorna: auth_type, user_id, org_id, actor (SHA-256), tenant_id, email_hash
+
+# INT3.2/DN4: Hash do ator para não-repúdio
+def hash_clerk_actor(user_id: str, org_id: str) -> str:
+    return hashlib.sha256(f"{user_id}:{org_id}".encode()).hexdigest()
+```
+
+**Módulo de autenticação híbrida (`src/core/auth_hybrid.py`):**
+
+```python
+# INT3.3: Orquestrador — detecta método de autenticação e normaliza identidade
+def authenticate_hybrid(
+    authorization: Optional[str],  # Bearer token Clerk
+    account_key: Optional[str],    # API Key legada
+    app_key: Optional[str],        # API Key legada
+) -> dict:
+    # → Clerk JWT: chama verify_clerk_token() + extract_clerk_identity()
+    # → API Keys: valida contra VALID_CREDENTIAL_PAIRS, gera actor=SHA-256(account_key)
+    # → Nenhum: HTTP 401 com orientação sobre ambos os métodos
+```
+
+**Endpoint híbrido (`src/core/api.py`):**
+
+```python
+# INT3 — Endpoint de auditoria com autenticação híbrida
+@app.post("/api/v1/auditar/clerk", status_code=201)
+async def processar_auditoria_clerk(payload, authorization, account_key, app_key):
+    # Reutiliza validações DN2, DN4 e RF2
+    # actor derivado da identidade híbrida (Clerk ou API Key)
+    # tenant_id registrado no TransactionHistoryStore
+```
+
+### Metodologia de Testagem (Blue Team — TDD)
+
+&emsp;A aferição foi conduzida utilizando abordagem Test Data Driven (TDD) através do script `src/tests/blue_team/INT3_clerk_auth_blue.py`.
+
+&emsp;**Cada cenário de teste é executado 3 vezes** (iterações parametrizadas via `@pytest.mark.parametrize`) para garantir consistência e reprodutibilidade dos resultados.
+
+&emsp;**Massa de testes:** Os payloads simulam sessões reais de auditoria fiscal com volumes variados (`PAYLOAD_VALIDO`: 3200.00 docs para EFD_ICMS_IPI; `PAYLOAD_ALTERNATIVO`: 8100.75 docs para NCM_AUDIT), exercitando ambos os métodos de autenticação.
+
+&emsp;**Versão da API testada:** v2.0.0 — `POST /api/v1/auditar/clerk`
+
+&emsp;**Isolamento de chamadas externas:** O cache JWKS é substituído por `_MockJWKSCache` e o `jwt.decode` é mockado via `unittest.mock.patch`, garantindo que nenhuma chamada de rede real ao Clerk ocorra durante a suíte.
+
+**Estrutura dos testes (5 classes, 20 cenários × 3 iterações = 60 execuções):**
+
+| Classe de Teste                     | Cenários          | Direcionador |
+| :---------------------------------- | :---------------- | :----------- |
+| `TestINT3JWTValidation`             | 5 testes × 3 iter | INT3.1       |
+| `TestINT3TenantIsolation`           | 3 testes × 3 iter | INT3.2       |
+| `TestINT3HybridAuthentication`      | 4 testes × 3 iter | INT3.3       |
+| `TestINT3LGPDCompliance`            | 4 testes × 3 iter | INT3.4       |
+| `TestINT3NonRepudiationIntegration` | 4 testes × 3 iter | INT3.5       |
+
+### Resultados Obtidos
+
+&emsp;A suíte de testes validou a implementação do INT3 com os seguintes indicadores:
+
+- **Status Final:** APROVADO ✅
+
+- **Taxa de Cobertura:** 100% (20 cenários × 3 iterações = 60 execuções passando)
+
+- **Cenários Testados:**
+  - 15 cenários de validação JWT (INT3.1)
+  - 9 cenários de isolamento de tenant (INT3.2)
+  - 12 cenários de autenticação híbrida (INT3.3)
+  - 12 cenários de conformidade LGPD (INT3.4)
+  - 12 cenários de integração com DN4 (INT3.5)
+
+- **Verificações de Negócio:**
+  - INT3.1: Token válido aceito, expirado/inválido/ausente rejeitados → 5 testes ✅
+  - INT3.2: Actors distintos por tenant, histórico isolado → 3 testes ✅
+  - INT3.3: Clerk e API Key no mesmo endpoint, resposta normalizada → 4 testes ✅
+  - INT3.4: PII ausente em logs, actor=SHA-256 verificável → 4 testes ✅
+  - INT3.5: Recibo digital e cadeia de hash íntegros em ambos os métodos → 4 testes ✅
+
+### Execução dos Testes
+
+```bash
+# Instalar dependências (inclui PyJWT e python-jose para validação JWT)
+pip install -r requirements.txt
+
+# Executar todos os testes INT3 (Blue Team)
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py -v
+
+# Executar por classe de teste
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3JWTValidation -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3TenantIsolation -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3HybridAuthentication -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3LGPDCompliance -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3NonRepudiationIntegration -v
+```
+
+### Decisão Arquitetural e Contexto de BD/DN
+
+&emsp;A escolha do **modelo de autenticação híbrida** — mantendo API Keys para integração M2M e adicionando Clerk JWT para usuários e aplicações modernas — decorre de um risco de negócio identificado pelo Red Team (DN4.R2 — Header Impersonation, **FAIL**): o sistema atual não valida autenticidade real de credenciais, comprometendo o mecanismo de não-repúdio (DN4). A correção via Clerk resolve esse gap sem quebrar retrocompatibilidade com integrações existentes.
+
+&emsp;A decisão de derivar o `actor` como `SHA-256(user_id:org_id)` para Clerk — em vez de apenas `SHA-256(user_id)` — é intencional: ela vincula cada transação não apenas ao usuário, mas à **organização (tenant)** à qual pertence, garantindo que o isolamento de contas (DN4) seja rastreável de forma criptograficamente verificável. Isso é especialmente relevante no contexto bancário e fiscal, onde auditorias externas podem exigir prova de que determinada transação pertence a uma conta específica.
+
+&emsp;O **cache JWKS com TTL de 1 hora** é uma decisão de desempenho derivada diretamente do SLA de 500ms (DN1/RNF3): sem cache, cada requisição JWT exigiria uma chamada HTTP ao endpoint do Clerk, adicionando latência de rede incompatível com o SLA estabelecido.
+
+### Configuração de Variáveis de Ambiente
+
+&emsp;A integração Clerk requer três variáveis de ambiente configuradas no arquivo `.env` (use `.env.example` como referência):
+
+```bash
+# Como obter as chaves:
+# 1. Crie uma conta em https://clerk.com e um novo Application.
+# 2. Em "API Keys" do dashboard, copie as chaves abaixo.
+# 3. CLERK_JWKS_URL: disponível em Settings > API Keys > "Show JWKS URL"
+
+CLERK_PUBLISHABLE_KEY=pk_test_seu_valor_aqui
+CLERK_SECRET_KEY=sk_test_seu_valor_aqui
+CLERK_JWKS_URL=https://seu-dominio.clerk.accounts.dev/.well-known/jwks.json
+```
+
+### Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados
+
+**Aspectos positivos:**
+
+- **Resolução do gap de autenticidade (RNF2/DN4):** A integração Clerk elimina a vulnerabilidade de Header Impersonation identificada pelo Red Team (DN4.R2 — FAIL), tornando o `actor` de não-repúdio criptograficamente vinculado a uma identidade verificada por um IDP externo.
+- **Isolamento de contas robusto (DN4):** O mapeamento Clerk Organization → tenant garante que cada cliente opera em um espaço isolado, com histórico de transações, rate limiting e audit log segregados por `tenant_id`.
+- **Conformidade LGPD por design:** A pseudonimização SHA-256 de todos os identificadores pessoais é aplicada na camada de extração de claims, garantindo que nenhuma PII chegue a logs ou respostas — arquitetura _privacy by design_.
+- **Retrocompatibilidade total:** O modelo híbrido garante que integrações M2M existentes (API Keys) continuem funcionando sem modificações, reduzindo o risco de migração.
+- **Base para padrões bancários:** A adoção de OpenID Connect / OAuth 2.0 com IDP externo é o padrão do mercado financeiro (Open Banking, FAPI), criando fundação para futuras certificações de segurança.
+
+**Aspectos negativos / fora do foco atual:**
+
+- A validação JWT depende de conectividade com o endpoint JWKS do Clerk durante a inicialização (ou na primeira requisição após expiração do cache). Em ambientes totalmente isolados (air-gapped), seria necessário pré-carregar as chaves.
+- O modelo atual não implementa revogação de token em tempo real (token blacklist) — um token válido mas comprometido permaneceria aceito até sua expiração natural. Em produção, recomenda-se integração com o endpoint de revogação do Clerk.
+- O `CLERK_SECRET_KEY` presente no `.env` não é utilizado na validação JWT (que usa JWKS público), mas é necessário para operações administrativas via Clerk Backend API. Deve ser tratado como segredo e nunca versionado.
+- Não foram implementados testes Red Team para INT3 (ex.: ataques de token replay, JWK confusion, algorithm confusion). Ficam como recomendação para a próxima sprint.
+
+**Justificativa de priorização:** A integração INT3 foi priorizada como primeira integração externa da sprint por ser pré-requisito para as demais: sem autenticidade real, os mecanismos de isolamento (DN4), não-repúdio e conformidade LGPD perdem fundamento. A escolha do Clerk em substituição ao Auth0 original decorre de menor complexidade de configuração inicial e SDK mais direto para validação JWT server-side em Python.

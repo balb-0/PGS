@@ -25,6 +25,10 @@ reports/*.json
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
+pytest-report.xml
+.sonar/
+.scannerwork/
 
 # --- SISTEMA OPERACIONAL E EDITORES ---
 .DS_Store
