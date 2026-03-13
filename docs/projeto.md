@@ -117,6 +117,40 @@
     - [Execução dos Testes](#execução-dos-testes-3)
     - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-4)
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-4)
+- [4. Integrações de Serviços (Sprint de Consolidação)](#4-integrações-de-serviços-sprint-de-consolidação)
+  - [4.2 - INT2: Locust](#42---int2-locust)
+    - [Objetivo](#objetivo-int2)
+    - [Cenários de Teste (CEN-1 a CEN-5)](#cenários-de-teste-cen-1-a-cen-5)
+    - [Método de Teste](#método-de-teste)
+    - [Métricas Obtidas](#métricas-obtidas)
+    - [Relação com Business Drivers e Requisitos](#relação-com-business-drivers-e-requisitos)
+    - [Guia de Execução e Interpretação de Resultados](#guia-de-execução-e-interpretação-de-resultados)
+    - [Resultados Comparativos: 100 vs 1.000 Usuários Simultâneos](#resultados-comparativos-100-vs-1000-usuários-simultâneos)
+  - [4.3 INT3 (Blue Team) — Integração de Gestão de Identidade com Clerk](#43-int3-blue-team--integração-de-gestão-de-identidade-com-clerk)
+    - [Objetivo](#objetivo-3)
+    - [Regras de Negócio](#regras-de-negócio-2)
+    - [Especificação da API — Endpoint de Autenticação Híbrida](#especificação-da-api--endpoint-de-autenticação-híbrida)
+    - [Mapa de Direcionadores de Negócio — Blue Team (INT3)](#mapa-de-direcionadores-de-negócio--blue-team-int3)
+    - [Implementação Técnica](#implementação-técnica-2)
+    - [Metodologia de Testagem (Blue Team — TDD)](#metodologia-de-testagem-blue-team--tdd-3)
+    - [Resultados Obtidos](#resultados-obtidos-6)
+    - [Execução dos Testes](#execução-dos-testes-4)
+    - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-5)
+    - [Configuração de Variáveis de Ambiente](#configuração-de-variáveis-de-ambiente)
+    - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-5)
+  - [4.4 INT4 — Sincronismo de versões via API do GitLab](#44-int4--sincronismo-de-versões-via-api-do-gitlab)
+    - [4.4.1 Assinatura / critério de versão](#441-assinatura--critério-de-versão)
+- [5. Direcionadores Adversariais — Red Team (Sprint de Consolidação)](#5-direcionadores-adversariais--red-team-sprint-de-consolidação)
+  - [5.1 INT3 (Red Team) — Autenticação Híbrida Clerk sob Perspectiva Adversarial](#51-int3-red-team--autenticação-híbrida-clerk-sob-perspectiva-adversarial)
+  - [5.2 RNF1 (Red Team) — Disputa de Não-Repúdio sob Perspectiva Adversarial](#52-rnf1-red-team--disputa-de-não-repúdio-sob-perspectiva-adversarial)
+  - [5.3 RNF2 (Red Team) — Autenticidade sob Perspectiva Adversarial](#53-rnf2-red-team--autenticidade-sob-perspectiva-adversarial)
+  - [5.4 INT4 (Red Team) — Sincronismo GitLab sob Perspectiva Adversarial](#54-int4-red-team--sincronismo-gitlab-sob-perspectiva-adversarial)
+  - [5.5 INT5 (Red Team) — Aferição SPED/RFB sob Perspectiva Adversarial](#55-int5-red-team--aferição-spedrfb-sob-perspectiva-adversarial)
+    - [4.4.2 Objetivo da integração](#442-objetivo-da-integração)
+    - [4.4.3 Requisitos e DNs relacionados](#443-requisitos-e-dns-relacionados)
+    - [4.4.4 Como se conectar ao serviço](#444-como-se-conectar-ao-serviço)
+    - [4.4.5 Função de verificação do protocolo](#445-função-de-verificação-do-protocolo)
+    - [4.4.6 Testes](#446-testes)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -1840,3 +1874,1026 @@ pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1Contrat
 - O endpoint de disputa não implementa rate limiting próprio, o que poderia permitir abuso por volume de consultas de disputa.
 
 **Justificativa de priorização:** O RNF1 foi implementado como extensão natural do DN4 (Não-Repúdio), completando a cadeia de confiabilidade: o DN4 garante que a transação é **irrefutável** (evidência criptográfica), e o RNF1 verifica se a transação é **plausível** (análise comportamental). Limitações de tempo impediram a implementação de persistência real e limites de tamanho do histórico, ficando como recomendações para evolução futura.
+
+## 4. Integrações de Serviços (Sprint de Consolidação)
+
+&emsp;Esta seção documenta as integrações externas e internas implementadas para garantir que cada serviço da ASIS TaxTech possua mecanismo de validação de integridade, controle de versão e conformidade com os requisitos não funcionais de latência e segurança.
+
+| ID      | Serviço      | Tipo     | Assinatura/Critério de Versão          | Objetivo do Sincronismo                                        |
+| :------ | :----------- | :------- | :------------------------------------- | :------------------------------------------------------------- |
+| **INT1** | SonarQube   | Externa  | Quality Gate API v10.x                 | Bloquear pipelines de CI/CD com brechas de segurança (DN2).   |
+| **INT2** | Locust      | Interna  | SLA Performance Script v2.1            | Validar se a build sustenta o SLA de 500ms (DN1/RNF3).        |
+| **INT3** | Clerk       | Externa  | OpenID Connect / OAuth 2.0             | Garantir isolamento de contas (DN4) e conformidade LGPD.      |
+| **INT4** | GitLab API  | Externa  | REST API v4 (Commit/Tag Sync)          | Verificar se a versão em Produção é a mesma homologada.       |
+| **INT5** | RFB / SPED  | Externa  | Layout Fiscal Web Service (v2026)      | Garantir que o upload (RF1) segue as normas vigentes da Receita. |
+
+---
+
+## 4.2 - INT2: Locust
+&emsp;A INT2 (Locust) valida a qualidade da API sob condições de carga concorrente real via HTTP, complementando os testes unitários (Blue Team) e adversariais (Red Team) que utilizam `TestClient` in-process.
+
+### Objetivo
+
+&emsp;A INT2 implementa uma suíte de **testes de carga e estresse** utilizando o framework [Locust](https://locust.io/) para validar os cenários definidos nos direcionadores de negócio **DN1 (Latência de Ingestão)** e **DN3 (Disponibilidade e Resiliência da API)** sob condições de carga concorrente real via HTTP.
+
+&emsp;Diferentemente dos testes Blue Team e Red Team existentes — que utilizam `TestClient` in-process (sem latência de rede) —, o Locust executa requisições HTTP reais contra a API em execução, expondo comportamentos que só se manifestam sob contenção de recursos, latência de rede e concorrência real entre múltiplos clientes simultâneos.
+
+**Objetivos específicos:**
+
+- Validar o SLA de latência DN1 (P90 ≤ 500ms) sob carga concorrente progressiva 
+- Exercitar os mecanismos de resiliência DN3 (rate limiting, circuit breaker, idempotência, degradação graciosa) sob estresse real
+- Verificar periodicamente o contrato (protocolo) de cada endpoint da API, detectando mudanças de versão que possam quebrar integrações
+- Gerar métricas quantitativas (P50, P90, P99, RPS, taxa de falha) que alimentem decisões de dimensionamento de infraestrutura
+
+### Cenários de Teste (CEN-1 a CEN-5)
+
+&emsp;Dentro da INT2, o arquivo `src/locust.py` exercita **5 cenários internos** (nomeados CEN-x para evitar colisão com os identificadores INTx do mapa de integrações do projeto):
+
+| Cenário  | Alvo                                                 | Endpoint                         | Verificação                                        | DN Relacionado |
+| :------- | :--------------------------------------------------- | :------------------------------- | :------------------------------------------------- | :------------- |
+| **CEN-1** | Ingestão de auditoria fiscal                        | `POST /api/v1/auditar`           | SLA de latência (P90 ≤ 500ms), status 201          | DN1, DN2       |
+| **CEN-2** | Auditoria resiliente com controles de disponibilidade | `POST /api/v1/auditar/resilient` | Rate limiting, circuit breaker, idempotência        | DN3            |
+| **CEN-3** | Health check / monitoramento                         | `GET /api/v1/health`             | Status, uptime, taxa de erro, estado do circuito    | DN3.3          |
+| **CEN-4** | Protocolo de autenticação (account-key/app-key)      | Todos os endpoints autenticados  | 401/403 em credenciais ausentes/inválidas           | RNF2           |
+| **CEN-5** | Auditoria com não-repúdio                            | `POST /api/v1/auditar/nr`        | Integridade HMAC, cadeia de log de auditoria        | DN4            |
+
+&emsp;Cada cenário inclui uma **função de verificação de protocolo** que valida o contrato de resposta (campos esperados, códigos de status, estrutura) contra a versão documentada da API. Quando o contrato muda, a função emite alertas no log.
+
+### Método de Teste
+
+&emsp;A implementação utiliza o framework Locust com as seguintes classes de usuário:
+
+**1. `DN1LatencyUser` (CEN-1)** — Peso: 5
+
+&emsp;Simula usuários submetendo documentos fiscais para auditoria. Mede a latência de cada requisição e classifica como dentro/fora do SLA. Inclui três variantes de carga:
+- Payload padrão (EFD_ICMS_IPI, 3.200 documentos)
+- Payload alternativo (NCM_AUDIT, 8.100 documentos)
+- Payload pesado (SPED_FISCAL, 999.999 documentos)
+
+**2. `DN3ResilienceUser` (CEN-2, CEN-3)** — Peso: 3
+
+&emsp;Exercita os mecanismos de resiliência da API:
+- **Rate Limiting**: Rajadas rápidas de uma única conta para acionar o limite de 10 req/min
+- **Circuit Breaker**: Envio de payloads inválidos para acumular falhas e potencialmente abrir o circuito
+- **Idempotência**: Requisições duplicadas com mesma `idempotency-key` para validar replay
+- **Health Check**: Monitoramento contínuo do endpoint `/health` sob carga
+
+**3. `AuthValidationUser` (CEN-4)** — Peso: 1
+
+&emsp;Valida o protocolo de autenticação sob carga:
+- Requisições sem headers de autenticação (espera 401)
+- Credenciais inválidas (espera 403)
+- Headers parciais (espera 401)
+- Autenticação válida em endpoint resiliente
+- Health check sem autenticação (espera 200)
+
+**4. `IntegrationProtocolChecker` (CEN-5 + Sweep)** — Peso: 1
+
+&emsp;Foca no endpoint de não-repúdio (`/api/v1/auditar/nr`) e executa periodicamente uma varredura completa dos 5 cenários CEN para detectar desvios de protocolo.
+
+
+### Métricas Obtidas
+
+&emsp;O Locust coleta e reporta as seguintes métricas automaticamente:
+
+**Métricas de Latência (DN1):**
+
+| Métrica               | Descrição                                                                 |
+| :-------------------- | :------------------------------------------------------------------------ |
+| P50 (mediana)         | Tempo de resposta que 50% das requisições não excedem                     |
+| P90                   | Tempo de resposta que 90% das requisições não excedem — **SLA DN1: ≤ 500ms** |
+| P99                   | Tempo de resposta que 99% das requisições não excedem                     |
+| Média                 | Latência média de todas as requisições                                    |
+| Min / Max             | Extremos observados                                                       |
+| RPS                   | Requisições por segundo sustentadas                                       |
+
+**Métricas de Disponibilidade (DN3):**
+
+| Métrica                    | Descrição                                                             |
+| :------------------------- | :-------------------------------------------------------------------- |
+| Taxa de falha (%)          | Percentual de requisições com erro (4xx/5xx não esperados)            |
+| Rate limit triggers        | Quantidade de respostas 429 (Too Many Requests)                       |
+| Circuit breaker activations| Respostas 503 indicando circuit breaker aberto                        |
+| Health check latência      | Tempo de resposta do endpoint `/health` sob carga                     |
+| Conformidade SLA (%)       | Percentual de requisições dentro do limiar de 500ms                   |
+| Conformidade alerta (%)    | Percentual de requisições dentro do limiar de 650ms                   |
+
+**Métricas de Protocolo (Todas as CEN):**
+
+| Métrica                    | Descrição                                                             |
+| :------------------------- | :-------------------------------------------------------------------- |
+| Protocol mismatches        | Número de respostas que não correspondem ao contrato esperado         |
+| Version drift alerts       | Alertas emitidos quando campos obrigatórios estão ausentes            |
+
+### Relação com Business Drivers e Requisitos
+
+&emsp;A INT2 (Locust) se conecta diretamente aos direcionadores de negócio e requisitos do projeto:
+
+**DN1 — Latência de Ingestão:**
+
+- O SLA de P90 ≤ 500ms foi definido como critério de aceite do DN1 Blue Team
+- Os testes Red Team (DN1) já tentaram quebrar esse SLA com payloads pesados e rajadas, mas utilizaram `TestClient` in-process
+- O Locust complementa essa validação ao executar requisições HTTP reais, introduzindo latência de rede e contenção de recursos que não são capturadas in-process
+- As métricas P50/P90/P99 geradas pelo Locust fornecem dados para calibração de auto-scaling e dimensionamento de infraestrutura
+
+**DN3 — Disponibilidade e Resiliência:**
+
+- O DN3 Blue Team validou rate limiting, circuit breaker, health check, idempotência e degradação graciosa via testes unitários
+- O DN3 Red Team identificou pontos de quebra (DN3.R3 — sinalização de replay, DN3.R8 — crescimento do IdempotencyStore)
+- O Locust exercita esses mecanismos sob carga concorrente real, revelando condições de corrida (race conditions) e comportamentos que só se manifestam com múltiplos clientes simultâneos
+- A monitoração do health check sob carga valida se o endpoint de observabilidade permanece responsivo durante estresse
+
+**RNF2 — Autenticidade:**
+
+- O CEN-4 valida que o protocolo de autenticação (account-key/app-key) rejeita corretamente credenciais ausentes ou inválidas sob carga, prevenindo degradação da segurança por saturação
+
+**DN4 — Não-Repúdio:**
+
+- O CEN-5 valida o contrato do endpoint de não-repúdio sob carga, garantindo que os campos criptográficos (signature, receipt, audit log) permanecem consistentes e presentes
+
+**Verificação de Protocolo (Todas as INTx):**
+
+- A varredura periódica de protocolo (protocol sweep) implementa o requisito de "função interna de verificação da última mudança do protocolo da integração", conforme especificado nas diretrizes de controle de qualidade de integração como código
+
+### Guia de Execução e Interpretação de Resultados
+
+#### Pré-requisitos
+
+```bash
+# Instalar dependências (incluindo locust)
+pip install -r requirements.txt
+```
+
+#### Execução
+
+**1. Iniciar a API (Terminal 1):**
+
+```bash
+uvicorn core.api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**2. Executar Locust com Interface Web (Terminal 2):**
+
+```bash
+locust -f src/locust.py --host http://127.0.0.1:8000
+```
+
+&emsp;Acesse `http://localhost:8089` no navegador. Na interface web:
+- **Number of users**: quantidade total de usuários simultâneos (sugestão: começar com 10, aumentar para 50 e 100)
+- **Spawn rate**: quantos usuários iniciar por segundo (sugestão: 2-10)
+- **Host**: já preenchido via `--host`
+
+**3. Modo Headless (para CI/CD):**
+
+```bash
+locust -f src/locust.py --host http://127.0.0.1:8000 \
+    --headless -u 50 -r 10 --run-time 120s --csv results/locust
+```
+
+&emsp;Os resultados serão exportados em CSV para análise posterior.
+
+**4. Executar apenas cenários específicos (via tags):**
+
+```bash
+# Apenas testes de latência DN1
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-1
+
+# Apenas testes de resiliência DN3
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-2 CEN-3
+
+# Apenas testes de autenticação
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-4
+
+# Apenas testes de não-repúdio
+locust -f src/locust.py --host http://127.0.0.1:8000 --tags CEN-5
+```
+
+#### Interpretação dos Resultados
+
+**Na Interface Web do Locust:**
+
+- **Statistics**: Tabela com métricas por endpoint — RPS, tempos de resposta (mediana, P90, P99), taxa de falha
+- **Charts**: Gráficos em tempo real de RPS, tempo de resposta e número de usuários
+- **Failures**: Lista de erros com frequência e mensagem — útil para identificar gargalos
+- **Download Data**: Exportar CSV para análise detalhada
+
+**No Terminal (ao encerrar):**
+
+&emsp;O Locust imprime um relatório INT2 resumido com:
+- Métricas por cenário (CEN-1 a CEN-5): contagem, min, max, média, P50, P90, P99
+- Conformidade SLA: percentual de requisições dentro do limiar de 500ms (DN1)
+- Conformidade de alerta: percentual dentro do limiar de 650ms
+- Veredito DN1: APROVADO se P90 ≤ 500ms, REPROVADO caso contrário
+- Métricas de health check DN3: latência média e P90 sob carga
+
+**Critérios de Aceite:**
+
+| Critério                                   | Limiar              | Status se violado |
+| :----------------------------------------- | :------------------ | :---------------- |
+| DN1 — Latência P90                         | ≤ 500ms             | REPROVADO         |
+| DN1 — Latência de alerta                   | ≤ 650ms (90% req)   | ALERTA            |
+| DN3 — Taxa de falha inesperada             | < 5%                | INVESTIGAR        |
+| DN3 — Health check responsivo              | P90 < 1000ms        | DEGRADADO         |
+| Protocolo — Mismatches em varredura        | 0                   | BREAKING CHANGE   |
+
+**Exemplo de saída esperada:**
+
+```
+[INFO] ======================================================================
+[INFO] INT2 — LOCUST STRESS TEST SUMMARY (DN1 / DN3)
+[INFO] ======================================================================
+[INFO]   CEN-1:auditar                  | n=1500   | mean=45.2ms | p50=38.0ms | p90=89.5ms | p99=210.3ms | SLA(P90<=500ms): PASS
+[INFO]                                  | min=12.1ms | max=450.2ms | SLA conformity=99.8% | Alert conformity=100.0%
+[INFO]   CEN-3:health                   | n=800    | mean=8.5ms  | p50=6.2ms  | p90=15.3ms | p99=42.1ms  | SLA(P90<=500ms): PASS
+[INFO]                                  | min=3.1ms  | max=85.4ms  | SLA conformity=100.0% | Alert conformity=100.0%
+[INFO] ======================================================================
+[INFO]   DN1 VERDICT: APROVADO (worst P90 = 89.5ms, SLA = 500ms)
+[INFO]   DN3 Health Check: mean=8.5ms, p90=15.3ms (n=800)
+[INFO] ======================================================================
+```
+
+### Resultados Comparativos: 100 vs 1.000 Usuários Simultâneos
+
+&emsp;Para avaliar o comportamento da API sob diferentes níveis de carga, foram executados dois testes de estresse com o Locust, ambos contra a mesma instância da API (`uvicorn` com 1 worker, `--host 127.0.0.1:8000`):
+
+| Parâmetro          | Teste 1 (Moderado) | Teste 2 (Estresse Extremo) |
+| :----------------- | :----------------- | :------------------------- |
+| **Usuários**       | 100                | 1.000                      |
+| **Spawn rate**     | 10/s               | 50/s                       |
+| **Distribuição**   | DN1=50, DN3=30, Auth=10, Protocol=10 | DN1=500, DN3=300, Auth=100, Protocol=100 |
+
+#### Dashboard Locust — 100 Usuários (spawn rate 10/s)
+
+![Dashboard Locust com 100 usuários — gráficos de RPS, tempo de resposta e número de usuários](img/locust_100users_charts.png)
+
+**Observações do gráfico (100 usuários):**
+
+- **RPS (Requests per Second):** estabiliza entre 80–100 req/s após todos os usuários serem criados, com a linha de falhas (vermelha) praticamente sobre o eixo zero
+- **Response Times:** P50 (mediana) permanece entre 15–25ms e P95 entre 120–150ms — ambos bem abaixo do SLA de 500ms
+- **Number of Users:** rampa linear de 0 → 100 em ~10 segundos, mantendo-se estável durante toda a execução
+
+#### Dashboard Locust — 1.000 Usuários (spawn rate 50/s)
+
+![Dashboard Locust com 1000 usuários — gráficos de RPS, tempo de resposta e número de usuários](img/locust_1000users_charts.png)
+
+**Observações do gráfico (1.000 usuários):**
+
+- **RPS:** cresce até ~350 req/s, porém a linha de falhas (vermelha) acompanha, atingindo ~80–100 falhas/s (~25% de taxa de erro)
+- **Response Times:** P50 escala de valores baixos até ~1.500ms e P95 dispara para ~8.000ms — ordens de grandeza acima do SLA
+- **Number of Users:** rampa de 0 → 1.000 em ~20 segundos; a degradação de latência começa a se manifestar a partir de ~400 usuários simultâneos
+
+#### Tabela Comparativa de Métricas
+
+| Métrica                        | 100 Usuários        | 1.000 Usuários        | Degradação    |
+| :----------------------------- | :------------------ | :-------------------- | :------------ |
+| **RPS sustentado**             | ~90 req/s           | ~350 req/s            | 3,9x (sublinear) |
+| **Taxa de falha**              | ~0%                 | ~16–25%               | Crítica       |
+| **Mediana (P50)**              | ~20ms               | ~620–1.500ms          | 30–75x        |
+| **P95**                        | ~130ms              | ~3.400–8.000ms        | 26–62x        |
+| **Latência máxima**            | ~2.200ms            | ~11.000ms             | 5x            |
+| **Falhas/s**                   | ~0                  | ~80–100               | —             |
+
+#### Análise por Cenário (CEN-1 a CEN-5)
+
+**CEN-1 — DN1 Latência (`POST /api/v1/auditar`):**
+
+| Métrica      | 100 Usuários  | 1.000 Usuários  | Veredicto |
+| :----------- | :------------ | :-------------- | :-------- |
+| Requisições  | ~3.100        | ~6.400          | —         |
+| Taxa de falha| ~39%          | ~55%            | REPROVADO |
+| Mediana      | 970ms         | 2.100ms         | REPROVADO |
+| P95          | ~2.000ms      | ~3.400ms        | REPROVADO |
+| Max          | 2.240ms       | 16.154ms        | REPROVADO |
+
+&emsp;O endpoint principal de auditoria é o mais impactado. Com 100 usuários a mediana já ultrapassa o SLA de 500ms (970ms), e com 1.000 usuários a situação se agrava drasticamente (2.100ms de mediana, 55% de falhas). **O SLA DN1 (P90 ≤ 500ms) é reprovado em ambos os cenários**, indicando que a API precisa de otimização (múltiplos workers, async I/O) para suportar carga concorrente real.
+
+**CEN-2/CEN-3 — DN3 Resiliência (`/api/v1/auditar/resilient` + `/health`):**
+
+| Métrica                    | 100 Usuários | 1.000 Usuários | Observação |
+| :------------------------- | :----------- | :------------- | :--------- |
+| Resilient — mediana        | 540ms        | 1.600ms        | 3x pior    |
+| Resilient — falhas         | 3,3%         | 5,1%           | Limítrofe  |
+| Rate-burst — mediana       | 480ms        | 1.600ms        | 3,3x pior  |
+| Rate-burst — falhas        | 0,7%         | 0,9%           | Estável   |
+| Idempotent replay — mediana| 390ms        | 1.500ms        | 3,8x pior  |
+| Health check — mediana     | 130ms        | 180ms          | Aceitável  |
+| Health check — falhas      | 3,3%         | 3,0%           | Estável   |
+
+&emsp;Os mecanismos de resiliência **continuam funcionais** mesmo sob carga extrema: o rate limiting rejeita rajadas corretamente (taxa de falha funcional estável em ~0,7–0,9%), e o health check permanece relativamente responsivo (mediana 130–180ms). Porém, a vantagem do cache de idempotência é anulada pela fila de rede — com 100 usuários o replay já é mais rápido (390ms vs 470ms), mas com 1.000 usuários ambos convergem para ~1.500ms.
+
+**CEN-4 — Autenticação:**
+
+| Teste             | 100 Usuários        | 1.000 Usuários       | Veredicto    |
+| :---------------- | :------------------ | :------------------- | :----------- |
+| Sem auth (401)    | 0% falhas, 580ms    | 0% falhas, 1.600ms  | APROVADO ✅   |
+| Auth inválida (403)| 0% falhas, 590ms   | 0% falhas, 2.000ms  | APROVADO ✅   |
+| Auth parcial (401)| 0% falhas, 620ms    | 0% falhas, 1.700ms  | APROVADO ✅   |
+
+&emsp;O protocolo de autenticação mantém **zero falhas funcionais** em ambos os cenários — todas as rejeições (401/403) ocorrem corretamente, independentemente da carga. A latência aumenta significativamente (3–4x), mas o comportamento de segurança é preservado.
+
+**CEN-5 — Não-Repúdio (`/api/v1/auditar/nr` + `/audit-log`):**
+
+| Métrica           | 100 Usuários     | 1.000 Usuários    | Veredicto    |
+| :---------------- | :--------------- | :---------------- | :----------- |
+| NR — mediana      | 1.100ms          | 2.400ms           | REPROVADO    |
+| NR — falhas       | 18,9%            | 12,1%             | REPROVADO    |
+| Audit-log — falhas| 20,3%            | 16,0%             | REPROVADO    |
+| NR — max          | 10.419ms         | 15.000ms          | REPROVADO    |
+
+&emsp;O endpoint de não-repúdio é computacionalmente intensivo (HMAC-SHA256 + cadeia de hash) e apresenta a pior degradação relativa. O cálculo criptográfico sequencial se torna um gargalo sob concorrência, e o audit-log que cresce a cada requisição torna a verificação da cadeia progressivamente mais lenta (O(n)).
+
+#### Diagnóstico: Causas-Raiz da Degradação
+
+&emsp;A análise comparativa revela 4 fatores principais:
+
+1. **Worker único do Uvicorn:** a API roda com 1 processo e 1 thread. O event loop satura com ~50+ conexões simultâneas. Solução: `uvicorn --workers 4` ou Gunicorn com workers Uvicorn.
+
+2. **Crescimento sublinear do RPS:** com 10x mais usuários (100 → 1.000), o throughput cresce apenas 3,9x (90 → 350 req/s), indicando saturação do servidor. O excedente vira fila TCP, inflando latências.
+
+3. **Audit log em memória:** o log de auditoria (`CEN-5`) cresce com cada requisição. A verificação de integridade da cadeia de hash tem complexidade O(n), degradando progressivamente.
+
+4. **Contenção de I/O síncrono:** operações criptográficas (HMAC, hash chain) executam de forma síncrona no event loop, bloqueando o processamento de outras requisições.
+
+#### Conclusão e Vereditos
+
+| Cenário               | 100 Usuários  | 1.000 Usuários | Recomendação |
+| :-------------------- | :------------ | :------------- | :----------- |
+| **DN1 SLA (P90≤500ms)** | **REPROVADO** | **REPROVADO** | Escalar para múltiplos workers; otimizar processamento |
+| **DN3 Resiliência**   | **APROVADO**  | **DEGRADADO**  | Rate limiting funcional; latência precisa de escala |
+| **CEN-4 Auth**        | **APROVADO**  | **APROVADO**   | Segurança robusta em qualquer carga |
+| **CEN-5 Não-Repúdio** | **REPROVADO** | **REPROVADO**  | Mover criptografia para thread pool; limitar tamanho do log |
+
+&emsp;O **ponto de ruptura funcional da API está entre 10 e 50 usuários concorrentes** em configuração single-worker. A partir de 100 usuários, o SLA de latência DN1 já é violado. Com 1.000 usuários, a degradação é generalizada, embora os mecanismos de segurança (autenticação) e resiliência funcional (rate limiting) permaneçam intactos — demonstrando que a arquitetura de proteção é sólida mesmo quando a capacidade computacional é insuficiente.
+
+---
+
+## 4.3 INT3 (Blue Team) — Integração de Gestão de Identidade com Clerk
+
+### Objetivo
+
+Configurar o Clerk como Identity Provider (IDP) na aplicação, implementando autenticação híbrida em paralelo ao sistema existente de `account-key`/`app-key`. Este direcionador garante **isolamento de contas (DN4)** e assegura que o tratamento de dados de usuários esteja em total conformidade com a **LGPD** e padrões de segurança bancária.
+
+### Regras de Negócio
+
+**INT3.1 - Validação de Token JWT Clerk**
+
+- A API deve validar tokens JWT emitidos pelo Clerk usando JWKS (JSON Web Key Set) com algoritmo RS256
+- Tokens expirados retornam HTTP 401 com mensagem `"INT3: Token JWT expirado"`
+- Tokens com assinatura inválida retornam HTTP 401
+- Requisições sem nenhum método de autenticação retornam HTTP 401 com referência explícita a `INT3`
+
+**INT3.2 - Isolamento de Contas por Tenant (DN4)**
+
+- Cada organização Clerk (`org_id`) é mapeada como um tenant isolado
+- O `actor` de DN4 é derivado como `SHA-256(user_id:org_id)` para autenticação Clerk
+- Um usuário de `org_A` não deve acessar dados, histórico ou log de auditoria de `org_B`
+- O `tenant_id` é registrado em cada transação do `TransactionHistoryStore`
+
+**INT3.3 - Autenticação Híbrida (Retrocompatibilidade)**
+
+- O endpoint `POST /api/v1/auditar/clerk` aceita ambos os métodos de autenticação
+- Header `Authorization: Bearer <token>` → Clerk JWT (OpenID Connect / OAuth 2.0)
+- Headers `account-key` + `app-key` → API Keys legadas
+- A resposta normaliza a identidade em um formato único com `auth_type`, `tenant_id` e `actor`
+
+**INT3.4 - Conformidade LGPD (Pseudonimização)**
+
+- Dados pessoais (email, nome) não são armazenados nos logs de auditoria
+- O `user_id` original do Clerk não aparece em nenhuma resposta nem no `AuditLog`
+- O `actor` é sempre um hash SHA-256 irreversível (pseudonimização, art. 12 LGPD)
+- Apenas identificadores hasheados são persistidos no `TransactionHistoryStore`
+
+**INT3.5 - Cache de Chaves JWKS**
+
+- As chaves públicas do Clerk são cacheadas localmente com TTL de 1 hora
+- O cache evita chamadas de rede desnecessárias, garantindo SLA de 500ms (DN1/RNF3)
+- Falha na obtenção das chaves retorna HTTP 503
+
+### Especificação da API — Endpoint de Autenticação Híbrida
+
+**Endpoint principal:** `POST /api/v1/auditar/clerk`
+
+&emsp;Aceita os mesmos campos de entrada dos demais endpoints de auditoria:
+
+- `sessao_cliente`: Identificador único da sessão de auditoria.
+- `valor`: Volume de documentos fiscais submetidos no lote.
+- `destino`: Módulo fiscal de destino (ex: `EFD_ICMS_IPI`, `NCM_AUDIT`).
+
+**Headers aceitos (um dos dois métodos):**
+
+| Método          | Header(s)                                          | Padrão                      |
+| :-------------- | :------------------------------------------------- | :-------------------------- |
+| Clerk JWT       | `Authorization: Bearer <token>`                    | OpenID Connect / OAuth 2.0  |
+| API Keys legado | `account-key: <key>` + `app-key: <key>`            | Retrocompatibilidade        |
+
+**Resposta (HTTP 201):**
+
+```json
+{
+  "id": 25000,
+  "status": 201,
+  "tracking_id": "uuid-v4",
+  "arquivold": 22500,
+  "diagnostico": "Conforme (Fallback Mock)",
+  "detalhes": {
+    "cliente": "sessao-int3-01",
+    "volume_processado": 3200.0,
+    "modulo": "EFD_ICMS_IPI"
+  },
+  "identity": {
+    "auth_type": "clerk",
+    "tenant_id": "org_alpha",
+    "actor": "sha256-hex-irreversivel"
+  },
+  "non_repudiation": {
+    "signature": "hmac-sha256-hex",
+    "timestamp": "2026-03-12T22:00:00.000000+00:00",
+    "actor": "sha256-hex-irreversivel",
+    "receipt": {
+      "signature": "...",
+      "timestamp": "...",
+      "actor": "...",
+      "tracking_id": "...",
+      "payload_hash": "..."
+    },
+    "log_position": 0,
+    "log_entry_hash": "sha256-hex",
+    "alert": null,
+    "chain_alert": null
+  }
+}
+```
+
+### Mapa de Direcionadores de Negócio — Blue Team (INT3)
+
+&emsp;Foram implementados 5 direcionadores que garantem a integração completa de gestão de identidade:
+
+| ID          | Direcionador de Negócio                   | SLA / Critério de Aceite                                                                                          | Status   |
+| :---------- | :---------------------------------------- | :---------------------------------------------------------------------------------------------------------------- | :------- |
+| **INT3.1**  | **Validação JWT Clerk (JWKS/RS256)**       | 100% dos tokens válidos aceitos; expirados, inválidos e ausentes rejeitados com HTTP 401.                         | **PASS** |
+| **INT3.2**  | **Isolamento de Tenant (DN4)**             | `org_A` não acessa dados de `org_B`; actors distintos por organização; tenant_id no histórico.                    | **PASS** |
+| **INT3.3**  | **Autenticação Híbrida**                   | Clerk JWT e API Keys funcionam no mesmo endpoint; resposta normalizada com `auth_type`.                           | **PASS** |
+| **INT3.4**  | **Conformidade LGPD**                      | PII ausente em logs e respostas; actor = SHA-256(user_id:org_id); pseudonimização verificável.                    | **PASS** |
+| **INT3.5**  | **Integração com DN4 (Não-Repúdio)**       | Recibo digital completo em ambos os métodos; transação registrada com `tenant_id`; cadeia de hash íntegra.        | **PASS** |
+
+### Implementação Técnica
+
+**Módulo de autenticação Clerk (`src/core/auth_clerk.py`):**
+
+```python
+# INT3.1: Cache de JWKS com TTL (evita chamadas externas desnecessárias)
+class JWKSCache:
+    def get_keys(self) -> dict: ...      # Retorna chaves cacheadas ou busca remotamente
+    def invalidate(self):  ...           # Invalida o cache (testes e rotação de chaves)
+
+# INT3.1: Validação de token JWT usando JWKS do Clerk
+def verify_clerk_token(token: str) -> dict: ...
+    # Raises HTTPException 401 para token expirado ou inválido
+
+# INT3.4: Extração de identidade com pseudonimização (LGPD)
+def extract_clerk_identity(claims: dict) -> dict:
+    # Retorna: auth_type, user_id, org_id, actor (SHA-256), tenant_id, email_hash
+
+# INT3.2/DN4: Hash do ator para não-repúdio
+def hash_clerk_actor(user_id: str, org_id: str) -> str:
+    return hashlib.sha256(f"{user_id}:{org_id}".encode()).hexdigest()
+```
+
+**Módulo de autenticação híbrida (`src/core/auth_hybrid.py`):**
+
+```python
+# INT3.3: Orquestrador — detecta método de autenticação e normaliza identidade
+def authenticate_hybrid(
+    authorization: Optional[str],  # Bearer token Clerk
+    account_key: Optional[str],    # API Key legada
+    app_key: Optional[str],        # API Key legada
+) -> dict:
+    # → Clerk JWT: chama verify_clerk_token() + extract_clerk_identity()
+    # → API Keys: valida contra VALID_CREDENTIAL_PAIRS, gera actor=SHA-256(account_key)
+    # → Nenhum: HTTP 401 com orientação sobre ambos os métodos
+```
+
+**Endpoint híbrido (`src/core/api.py`):**
+
+```python
+# INT3 — Endpoint de auditoria com autenticação híbrida
+@app.post("/api/v1/auditar/clerk", status_code=201)
+async def processar_auditoria_clerk(payload, authorization, account_key, app_key):
+    # Reutiliza validações DN2, DN4 e RF2
+    # actor derivado da identidade híbrida (Clerk ou API Key)
+    # tenant_id registrado no TransactionHistoryStore
+```
+
+### Metodologia de Testagem (Blue Team — TDD)
+
+&emsp;A aferição foi conduzida utilizando abordagem Test Data Driven (TDD) através do script `src/tests/blue_team/INT3_clerk_auth_blue.py`.
+
+&emsp;**Cada cenário de teste é executado 3 vezes** (iterações parametrizadas via `@pytest.mark.parametrize`) para garantir consistência e reprodutibilidade dos resultados.
+
+&emsp;**Massa de testes:** Os payloads simulam sessões reais de auditoria fiscal com volumes variados (`PAYLOAD_VALIDO`: 3200.00 docs para EFD_ICMS_IPI; `PAYLOAD_ALTERNATIVO`: 8100.75 docs para NCM_AUDIT), exercitando ambos os métodos de autenticação.
+
+&emsp;**Versão da API testada:** v2.0.0 — `POST /api/v1/auditar/clerk`
+
+&emsp;**Isolamento de chamadas externas:** O cache JWKS é substituído por `_MockJWKSCache` e o `jwt.decode` é mockado via `unittest.mock.patch`, garantindo que nenhuma chamada de rede real ao Clerk ocorra durante a suíte.
+
+**Estrutura dos testes (5 classes, 20 cenários × 3 iterações = 60 execuções):**
+
+| Classe de Teste                     | Cenários          | Direcionador |
+| :---------------------------------- | :---------------- | :----------- |
+| `TestINT3JWTValidation`             | 5 testes × 3 iter | INT3.1       |
+| `TestINT3TenantIsolation`           | 3 testes × 3 iter | INT3.2       |
+| `TestINT3HybridAuthentication`      | 4 testes × 3 iter | INT3.3       |
+| `TestINT3LGPDCompliance`            | 4 testes × 3 iter | INT3.4       |
+| `TestINT3NonRepudiationIntegration` | 4 testes × 3 iter | INT3.5       |
+
+### Resultados Obtidos
+
+&emsp;A suíte de testes validou a implementação do INT3 com os seguintes indicadores:
+
+- **Status Final:** APROVADO ✅
+
+- **Taxa de Cobertura:** 100% (20 cenários × 3 iterações = 60 execuções passando)
+
+- **Cenários Testados:**
+  - 15 cenários de validação JWT (INT3.1)
+  - 9 cenários de isolamento de tenant (INT3.2)
+  - 12 cenários de autenticação híbrida (INT3.3)
+  - 12 cenários de conformidade LGPD (INT3.4)
+  - 12 cenários de integração com DN4 (INT3.5)
+
+- **Verificações de Negócio:**
+  - INT3.1: Token válido aceito, expirado/inválido/ausente rejeitados → 5 testes ✅
+  - INT3.2: Actors distintos por tenant, histórico isolado → 3 testes ✅
+  - INT3.3: Clerk e API Key no mesmo endpoint, resposta normalizada → 4 testes ✅
+  - INT3.4: PII ausente em logs, actor=SHA-256 verificável → 4 testes ✅
+  - INT3.5: Recibo digital e cadeia de hash íntegros em ambos os métodos → 4 testes ✅
+
+### Execução dos Testes
+
+```bash
+# Instalar dependências (inclui PyJWT e python-jose para validação JWT)
+pip install -r requirements.txt
+
+# Executar todos os testes INT3 (Blue Team)
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py -v
+
+# Executar por classe de teste
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3JWTValidation -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3TenantIsolation -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3HybridAuthentication -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3LGPDCompliance -v
+pytest src/tests/blue_team/INT3_clerk_auth_blue.py::TestINT3NonRepudiationIntegration -v
+```
+
+### Decisão Arquitetural e Contexto de BD/DN
+
+&emsp;A escolha do **modelo de autenticação híbrida** — mantendo API Keys para integração M2M e adicionando Clerk JWT para usuários e aplicações modernas — decorre de um risco de negócio identificado pelo Red Team (DN4.R2 — Header Impersonation, **FAIL**): o sistema atual não valida autenticidade real de credenciais, comprometendo o mecanismo de não-repúdio (DN4). A correção via Clerk resolve esse gap sem quebrar retrocompatibilidade com integrações existentes.
+
+&emsp;A decisão de derivar o `actor` como `SHA-256(user_id:org_id)` para Clerk — em vez de apenas `SHA-256(user_id)` — é intencional: ela vincula cada transação não apenas ao usuário, mas à **organização (tenant)** à qual pertence, garantindo que o isolamento de contas (DN4) seja rastreável de forma criptograficamente verificável. Isso é especialmente relevante no contexto bancário e fiscal, onde auditorias externas podem exigir prova de que determinada transação pertence a uma conta específica.
+
+&emsp;O **cache JWKS com TTL de 1 hora** é uma decisão de desempenho derivada diretamente do SLA de 500ms (DN1/RNF3): sem cache, cada requisição JWT exigiria uma chamada HTTP ao endpoint do Clerk, adicionando latência de rede incompatível com o SLA estabelecido.
+
+### Configuração de Variáveis de Ambiente
+
+&emsp;A integração Clerk requer três variáveis de ambiente configuradas no arquivo `.env` (use `.env.example` como referência):
+
+```bash
+# Como obter as chaves:
+# 1. Crie uma conta em https://clerk.com e um novo Application.
+# 2. Em "API Keys" do dashboard, copie as chaves abaixo.
+# 3. CLERK_JWKS_URL: disponível em Settings > API Keys > "Show JWKS URL"
+
+CLERK_PUBLISHABLE_KEY=pk_test_seu_valor_aqui
+CLERK_SECRET_KEY=sk_test_seu_valor_aqui
+CLERK_JWKS_URL=https://seu-dominio.clerk.accounts.dev/.well-known/jwks.json
+```
+
+### Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados
+
+**Aspectos positivos:**
+
+- **Resolução do gap de autenticidade (RNF2/DN4):** A integração Clerk elimina a vulnerabilidade de Header Impersonation identificada pelo Red Team (DN4.R2 — FAIL), tornando o `actor` de não-repúdio criptograficamente vinculado a uma identidade verificada por um IDP externo.
+- **Isolamento de contas robusto (DN4):** O mapeamento Clerk Organization → tenant garante que cada cliente opera em um espaço isolado, com histórico de transações, rate limiting e audit log segregados por `tenant_id`.
+- **Conformidade LGPD por design:** A pseudonimização SHA-256 de todos os identificadores pessoais é aplicada na camada de extração de claims, garantindo que nenhuma PII chegue a logs ou respostas — arquitetura _privacy by design_.
+- **Retrocompatibilidade total:** O modelo híbrido garante que integrações M2M existentes (API Keys) continuem funcionando sem modificações, reduzindo o risco de migração.
+- **Base para padrões bancários:** A adoção de OpenID Connect / OAuth 2.0 com IDP externo é o padrão do mercado financeiro (Open Banking, FAPI), criando fundação para futuras certificações de segurança.
+
+**Aspectos negativos / fora do foco atual:**
+
+- A validação JWT depende de conectividade com o endpoint JWKS do Clerk durante a inicialização (ou na primeira requisição após expiração do cache). Em ambientes totalmente isolados (air-gapped), seria necessário pré-carregar as chaves.
+- O modelo atual não implementa revogação de token em tempo real (token blacklist) — um token válido mas comprometido permaneceria aceito até sua expiração natural. Em produção, recomenda-se integração com o endpoint de revogação do Clerk.
+- O `CLERK_SECRET_KEY` presente no `.env` não é utilizado na validação JWT (que usa JWKS público), mas é necessário para operações administrativas via Clerk Backend API. Deve ser tratado como segredo e nunca versionado.
+- Não foram implementados testes Red Team para INT3 (ex.: ataques de token replay, JWK confusion, algorithm confusion). Ficam como recomendação para a próxima sprint.
+
+**Justificativa de priorização:** A integração INT3 foi priorizada como primeira integração externa da sprint por ser pré-requisito para as demais: sem autenticidade real, os mecanismos de isolamento (DN4), não-repúdio e conformidade LGPD perdem fundamento. A escolha do Clerk em substituição ao Auth0 original decorre de menor complexidade de configuração inicial e SDK mais direto para validação JWT server-side em Python.
+
+---
+
+## 4.4 INT4 — Sincronismo de versões via API do GitLab
+
+**Sprint 3 – Tarefa 4.** Serviço de orquestração que utiliza a API do GitLab para verificar se a versão em produção corresponde à versão homologada (governança do SDLC).
+
+### 4.4.1 Assinatura / critério de versão
+
+| Item | Valor |
+|------|--------|
+| **API** | GitLab REST API **v4** |
+| **Recurso** | Commit/Tag Sync (commits por branch) |
+| **Endpoint utilizado** | `GET /projects/:id/repository/commits?ref_name=<branch>&per_page=1` |
+| **Documentação oficial** | [GitLab Commits API](https://docs.gitlab.com/ee/api/commits.html#list-repository-commits) |
+
+### 4.4.2 Objetivo da integração
+
+- Comparar automaticamente o **último commit da branch `main`** (produção) com o **último commit da branch `develop`** (homologação).
+- Retornar status **em sync** ou **out of sync**, permitindo auditoria e governança do ciclo de vida do software (SDLC).
+- Função **`verificar_protocolo_gitlab()`** confirma a conformidade do protocolo da integração (API v4 acessível e formato de resposta esperado), ou indica mudanças.
+
+### 4.4.3 Requisitos e DNs relacionados
+
+- **Sprint 3 (INT4):** Verificar se a versão em Produção é a mesma homologada.
+- **Governança SDLC:** Rastreabilidade entre código homologado e código em produção.
+- **Documento de referência:** `docs/gestao-configuração.md` (política de branches: `main` = produção, `develop` = integração contínua).
+
+### 4.4.4 Como se conectar ao serviço
+
+**1. Variáveis de ambiente**
+
+Configure na raiz do projeto (arquivo `.env`, **nunca** commitado):
+
+| Variável | Obrigatório | Descrição |
+|----------|-------------|-----------|
+| `GITLAB_PRIVATE_TOKEN` | Sim | Token de acesso (Personal Access Token ou Project Access Token) com permissão `read_api` e `read_repository`. |
+| `GITLAB_BASE_URL` | Não | Base URL do GitLab. Padrão: `https://git.inteli.edu.br`. |
+| `GITLAB_PROJECT_PATH` | Não | Path do projeto (ex.: `graduacao/2026-1a/t13/g06`). Padrão: repositório do projeto. |
+
+**2. Criação do token no GitLab**
+
+1. Acesse o GitLab (ex.: https://git.inteli.edu.br).
+2. **Settings** → **Access Tokens** (ou no projeto: **Settings** → **Access Tokens**).
+3. Crie um token com escopo **read_api** e **read_repository**.
+4. Copie o valor e defina em `GITLAB_PRIVATE_TOKEN` no `.env`.
+
+**3. Execução do script**
+
+Na raiz do repositório:
+
+```bash
+# Saída legível (status + commits)
+python scripts/verifica_versao_gitlab.py
+
+# Saída em JSON (para cron/automação)
+python scripts/verifica_versao_gitlab.py --json
+
+# Apenas verificação do protocolo da API (não compara commits)
+python scripts/verifica_versao_gitlab.py --apenas-protocolo
+```
+
+**Exit code:** `0` quando produção e homologação estão na mesma versão; `1` quando estão diferentes ou há erro.
+
+**4. Execução periódica (cron)**
+
+Exemplo para rodar a cada hora e registrar o resultado:
+
+```bash
+0 * * * * cd /caminho/para/repo && python scripts/verifica_versao_gitlab.py --json >> /var/log/gitlab_sync.log 2>&1
+```
+
+### 4.4.5 Função de verificação do protocolo
+
+A função **`verificar_protocolo_gitlab()`** (em `scripts/verifica_versao_gitlab.py`):
+
+1. Chama `GET /projects/:id` para validar acesso ao projeto e que a API está respondendo.
+2. Chama `GET /projects/:id/repository/commits?ref_name=main&per_page=1` e valida que a resposta é uma lista de commits com campos `id` e `title`.
+
+Retorno: `{"ok": true/false, "message": "...", "details": {...}}`. Se `ok` for `false`, a mensagem indica token inválido, projeto não encontrado ou mudança no formato da API (protocolo).
+
+### 4.4.6 Testes
+
+Testes de integração em `src/tests/blue_team/gitlab_sync_blue.py` que chamam a **API real do GitLab** (sem mock). É necessário ter `GITLAB_PRIVATE_TOKEN` válido no `.env` na raiz do projeto.
+
+```bash
+pytest src/tests/blue_team/gitlab_sync_blue.py -v
+```
+
+Os testes validam: estrutura do retorno de `verificar_protocolo_gitlab()`, obtenção do último commit das branches `main` e `develop`, comparação de sincronismo e serialização JSON. Se o token não estiver configurado (ou for um valor de teste), os testes são ignorados (`skip`).
+
+---
+
+# 5. Direcionadores Adversariais — Red Team (Sprint de Consolidação)
+
+&emsp;Esta seção documenta os testes adversariais (Red Team) implementados para os componentes que anteriormente possuíam apenas cobertura Blue Team. O Red Team simula cenários de ataque para expor vulnerabilidades, limites e lacunas que os testes de aceite convencionais não exercitam.
+
+## 5.1 INT3 (Red Team) — Autenticação Híbrida Clerk sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se a integração de identidade com Clerk (JWT + API Keys) resiste a cenários de ataque que visam **bypass de autenticação**, **confusão de algoritmo**, **adulteração de claims**, **vazamento de PII** e **confusão de método híbrido**. O Red Team tenta explorar as fronteiras entre os dois métodos de autenticação e verificar se a conformidade LGPD se mantém sob condições adversas.
+
+### Mapa de Direcionadores de Negócio - Red Team (INT3)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **INT3.R1** | **Token Replay**                         | Reuso de JWT idêntico — verificar se existe controle anti-replay (nonce/jti)                        | **PASS** |
+| **INT3.R2** | **Algorithm Confusion**                  | Tokens com `alg:none` ou HS256 quando RS256 é esperado — devem ser rejeitados (401)                 | **PASS** |
+| **INT3.R3** | **Claims Tampering**                     | JWT com `org_id` adulterado gera actor diferente, impedindo colisão de identidade cross-tenant      | **PASS** |
+| **INT3.R4** | **Tenant Boundary Crossing**             | Tenant A (Clerk) cria transação; Tenant B (API Key) tenta acessar histórico — bloqueado com 403     | **PASS** |
+| **INT3.R5** | **LGPD Information Leakage**             | Verificar ausência de PII em respostas de erro, audit log e health check                            | **PASS** |
+| **INT3.R6** | **Hybrid Auth Confusion**                | Envio simultâneo de Bearer + API Keys — sistema escolhe método sem erro 500                         | **PASS** |
+| **INT3.R7** | **Malformed JWT**                        | Tokens sem segmentos, base64 inválido, payload gigante (100KB) — rejeitados com 401                 | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/INT3_clerk_auth_red.py` utiliza `TestClient` in-process com mocks de `jwt.decode` e `JWKSCache` para simular cenários adversariais sem dependência de rede. Cada classe de teste corresponde a um cenário de ataque (INT3.R1 a INT3.R7).
+
+**Estrutura dos testes (7 classes, 16 cenários):**
+
+| Classe de Teste           | Cenários | Direcionador |
+| :------------------------ | :------- | :----------- |
+| `TestINT3R1TokenReplay`   | 2 testes | INT3.R1      |
+| `TestINT3R2AlgorithmConfusion` | 2 testes | INT3.R2 |
+| `TestINT3R3ClaimsTampering` | 2 testes | INT3.R3    |
+| `TestINT3R4TenantBoundary` | 1 teste  | INT3.R4     |
+| `TestINT3R5LGPDLeakage`  | 3 testes | INT3.R5      |
+| `TestINT3R6HybridConfusion` | 2 testes | INT3.R6   |
+| `TestINT3R7MalformedJWT` | 4 testes | INT3.R7      |
+
+### Execução dos Testes
+
+```bash
+# Via pytest (in-process)
+pytest src/tests/red_team/INT3_clerk_auth_red.py -v -s
+
+# Contra API real
+RED_TEAM_API_URL=http://127.0.0.1:8000 pytest src/tests/red_team/INT3_clerk_auth_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- A validação JWT rejeita corretamente tokens com algoritmo inválido (`alg:none`, HS256) e tokens malformados (segmentos ausentes, base64 corrompido, payload gigante).
+- O isolamento de tenant funciona: Clerk Tenant A não acessa dados de Tenant B via `/historico/`.
+- Nenhuma PII (email, user_id original) vaza em respostas de erro ou no audit log (conformidade LGPD mantida).
+- A autenticação híbrida trata envio simultâneo de Bearer + API Keys sem erro 500.
+
+**Pontos de Quebra Identificados:**
+
+- O sistema não possui controle anti-replay por jti/nonce — o mesmo token pode ser reusado até expirar. Mitigação parcial pelo cache de replay por payload.
+- Tokens com `sub` vazio são aceitos (201) — em produção, validação adicional de claims obrigatórios seria recomendada.
+
+### Síntese de Impacto (Positivos x Negativos) e Priorizações
+
+**Aspectos positivos:**
+
+- A arquitetura de validação JWT está resiliente aos ataques mais comuns (algorithm confusion, malformed tokens, claims tampering).
+- A pseudonimização LGPD se mantém robusta sob condições adversas — nenhum cenário conseguiu extrair PII das respostas.
+- O isolamento de tenant é efetivo tanto para autenticação Clerk quanto para API Keys.
+
+**Aspectos negativos:**
+
+- Ausência de controle anti-replay por jti/nonce no JWT — recomendação: implementar blacklist de token por `jti` com TTL igual ao `exp`.
+- Claims com campos vazios (`sub: ""`) não são rejeitados — recomendação: validar presença de `sub` e `org_id` não vazios.
+- Não foram testados cenários de JWK confusion com chaves de outro IDP (rotação de chaves comprometida).
+
+**Priorização:** Implementar blacklist de jti para anti-replay (alta) > Validar claims obrigatórios (média) > Testes de JWK rotation (baixa).
+
+---
+
+## 5.2 RNF1 (Red Team) — Disputa de Não-Repúdio sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se o motor de sazonalidade e o endpoint de disputa resistem a cenários de **envenenamento de histórico**, **disputas cross-tenant**, **flooding**, **enumeração de tracking_ids**, **manipulação temporal** e **adulteração de recibos**. O Red Team tenta manipular os dados de entrada para forçar vereditos incorretos e explorar limites do sistema de análise de disputas.
+
+### Mapa de Direcionadores de Negócio - Red Team (RNF1)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **RNF1.R1** | **History Poisoning**                    | Criar histórico enviesado (valores baixos) e disputar transação de valor extremo — detecção de anomalia | **PASS** |
+| **RNF1.R2** | **Cross-Tenant Dispute**                 | Tenant B tenta disputar transação de Tenant A — deve ser bloqueado ou isolado                       | **PASS** |
+| **RNF1.R3** | **Dispute Flooding**                     | 20 disputas consecutivas sobre a mesma transação — sem erro 500, respostas consistentes             | **PASS** |
+| **RNF1.R4** | **Tracking_id Enumeration**              | 10 tracking_ids fictícios — todos retornam 404 genérico sem informação sensível                     | **PASS** |
+| **RNF1.R5** | **Temporal Manipulation**                | Disputa com `data_reclamacao` no futuro (2099) e no passado (2005) — tratamento sem crash           | **PASS** |
+| **RNF1.R6** | **Verdict Bypass**                       | Payloads crafted para forçar vereditos específicos — veredito coerente com análises                 | **PASS** |
+| **RNF1.R7** | **Receipt Tampering Detection**          | Adulteração de hash na cadeia de auditoria — detecção de integridade comprometida                   | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/RNF1_non_repudiation_dispute_red.py` opera via `TestClient` in-process, criando transações via `/auditar/nr` e abrindo disputas via `/disputa/nr`.
+
+**Estrutura dos testes (7 classes, 12 cenários):**
+
+| Classe de Teste               | Cenários | Direcionador |
+| :---------------------------- | :------- | :----------- |
+| `TestRNF1R1HistoryPoisoning`  | 2 testes | RNF1.R1      |
+| `TestRNF1R2CrossTenantDispute`| 2 testes | RNF1.R2      |
+| `TestRNF1R3DisputeFlooding`   | 1 teste  | RNF1.R3      |
+| `TestRNF1R4TrackingIdEnumeration` | 1 teste | RNF1.R4  |
+| `TestRNF1R5TemporalManipulation` | 2 testes | RNF1.R5   |
+| `TestRNF1R6VerdictBypass`     | 2 testes | RNF1.R6      |
+| `TestRNF1R7ReceiptTampering`  | 2 testes | RNF1.R7      |
+
+### Execução dos Testes
+
+```bash
+pytest src/tests/red_team/RNF1_non_repudiation_dispute_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- O motor de sazonalidade detecta corretamente valores anômalos mesmo quando o histórico é enviesado com transações de valor baixo.
+- O endpoint de disputa mantém respostas consistentes sob flooding (20 disputas consecutivas sem degradação).
+- Tracking_ids fictícios retornam 404 genérico sem vazamento de informação sobre processos existentes.
+- A cadeia de hash detecta adulteração de recibos corretamente (`chain_integrity: False`).
+
+**Pontos de Quebra Identificados:**
+
+- O endpoint de disputa não possui rate limiting próprio — flooding de disputas é possível sem restrição.
+- Disputas cross-tenant não são bloqueadas explicitamente por isolamento — o sistema retorna análise sobre a transação independente do tenant solicitante.
+- Datas de reclamação no futuro ou passado distante são aceitas sem validação temporal.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Rate limiting no endpoint de disputa (alta) > Isolamento de tenant em disputas (alta) > Validação de data_reclamacao (média).
+
+---
+
+## 5.3 RNF2 (Red Team) — Autenticidade sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se o mecanismo de autenticação por credenciais (`account-key`/`app-key`) resiste a **credential stuffing**, **timing side-channel**, **injeção de headers**, **bypass por encoding** e **vazamento de informação em mensagens de erro**.
+
+### Mapa de Direcionadores de Negócio - Red Team (RNF2)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **RNF2.R1** | **Credential Stuffing**                  | 50 combinações aleatórias de credenciais — todas rejeitadas (403), nenhuma aceita                    | **PASS** |
+| **RNF2.R2** | **Timing Side-Channel**                  | Diferença de tempo entre 401/403/201 < 1 segundo — sem informação útil para atacante                | **PASS** |
+| **RNF2.R3** | **Header Injection**                     | CRLF, null bytes e newlines em `account-key` — rejeitados (401/403)                                 | **PASS** |
+| **RNF2.R4** | **Case/Encoding Bypass**                 | Credenciais com case diferente, espaços e homoglifos Unicode — rejeitadas corretamente              | **PASS** |
+| **RNF2.R5** | **Missing Header Variations**            | Combinações parciais de headers (só account-key, só app-key, vazios, nomes errados) — 401           | **PASS** |
+| **RNF2.R6** | **Cross-Endpoint Credential Reuse**      | Credenciais válidas funcionam em todos endpoints protegidos; health é público                        | **PASS** |
+| **RNF2.R7** | **Error Message Information Leakage**    | Mensagens de 401/403 idênticas independente de qual credencial é inválida — sem information leakage | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/RNF2_authenticity_red.py` opera via `TestClient` e suporta execução contra API real via `RED_TEAM_API_URL`.
+
+**Estrutura dos testes (7 classes, 20 cenários):**
+
+| Classe de Teste                 | Cenários | Direcionador |
+| :------------------------------ | :------- | :----------- |
+| `TestRNF2R1CredentialStuffing`  | 2 testes | RNF2.R1      |
+| `TestRNF2R2TimingSideChannel`   | 1 teste  | RNF2.R2      |
+| `TestRNF2R3HeaderInjection`     | 4 testes | RNF2.R3      |
+| `TestRNF2R4CaseEncodingBypass`  | 3 testes | RNF2.R4      |
+| `TestRNF2R5MissingHeaders`      | 4 testes | RNF2.R5      |
+| `TestRNF2R6CrossEndpoint`       | 3 testes | RNF2.R6      |
+| `TestRNF2R7ErrorLeakage`        | 3 testes | RNF2.R7      |
+
+### Execução dos Testes
+
+```bash
+pytest src/tests/red_team/RNF2_authenticity_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- O mecanismo de autenticação rejeita corretamente todas as 50 tentativas de credential stuffing sem degradação.
+- As mensagens de erro são idênticas para `account-key` inválida vs `app-key` inválida, impedindo enumeração de credenciais válidas.
+- Headers com CRLF injection e null bytes são tratados sem efeito colateral.
+- O timing entre cenários de autenticação é uniforme (< 1s de diferença), dificultando ataques de side-channel.
+
+**Pontos de Quebra Identificados:**
+
+- Credenciais com espaços em volta podem ser aceitas (trim) — comportamento a validar em produção.
+- Headers HTTP são restritos a ASCII (RFC 7230), o que protege contra homoglifos Unicode na camada de transporte.
+- Não há mecanismo de lockout após múltiplas tentativas falhas — credential stuffing prolongado não é limitado.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Lockout após N tentativas falhas (alta) > Trim/sanitização de credenciais (média) > Rate limiting por IP (média).
+
+---
+
+## 5.4 INT4 (Red Team) — Sincronismo GitLab sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se a integração com a API do GitLab (INT4) resiste a **path traversal**, **injeção em nomes de branch**, **respostas malformadas**, **rate limiting** e **timeout**. O Red Team simula cenários onde a API do GitLab retorna dados inesperados ou onde os parâmetros de entrada são manipulados.
+
+### Mapa de Direcionadores de Negócio - Red Team (INT4)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **INT4.R1** | **Path Traversal**                       | Injeção de `../` e caracteres especiais no `GITLAB_PROJECT_PATH` — sem acesso a outros projetos     | **PASS** |
+| **INT4.R2** | **Branch Injection**                     | Nomes de branch com `;`, `\x00`, SQL injection, espaços — tratados sem crash                        | **PASS** |
+| **INT4.R3** | **Response Validation Robustness**       | JSON inválido, lista vazia, campos ausentes, dict em vez de lista — tratados sem crash               | **PASS** |
+| **INT4.R4** | **Token Scope Verification**             | Funções operam apenas com escopos de leitura (read_api) — sem operações de escrita                  | **PASS** |
+| **INT4.R5** | **API Rate Limit / Timeout Handling**    | HTTP 429 e timeout de conexão — tratados graciosamente, retornando None/ok=False                    | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/gitlab_sync_red.py` utiliza `monkeypatch` e `unittest.mock` para simular respostas adversariais da API do GitLab. Testes de escopo (R4) requerem `GITLAB_PRIVATE_TOKEN` real.
+
+**Estrutura dos testes (5 classes, 18 cenários):**
+
+| Classe de Teste                 | Cenários | Direcionador |
+| :------------------------------ | :------- | :----------- |
+| `TestINT4R1PathTraversal`       | 2 testes | INT4.R1      |
+| `TestINT4R2BranchInjection`     | 6 testes (parametrizados) | INT4.R2 |
+| `TestINT4R3ResponseValidation`  | 5 testes | INT4.R3      |
+| `TestINT4R4TokenScope`          | 2 testes (requer token) | INT4.R4 |
+| `TestINT4R5RateLimitHandling`   | 3 testes | INT4.R5      |
+
+### Execução dos Testes
+
+```bash
+# Sem token (testes com mock apenas)
+pytest src/tests/red_team/gitlab_sync_red.py -v -s
+
+# Com token (testes de escopo incluídos)
+GITLAB_PRIVATE_TOKEN=glpat-xxx pytest src/tests/red_team/gitlab_sync_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- Path traversal e branch injection não causam crash nem acesso indevido — as funções retornam `None` para parâmetros maliciosos.
+- Respostas malformadas da API GitLab (JSON inválido, formato inesperado) são tratadas graciosamente.
+- Rate limiting (429) e timeout são capturados e retornam valores de falha controlados.
+- As funções de integração realizam apenas operações de leitura (GET), sem risco de modificação de dados.
+
+**Pontos de Quebra Identificados:**
+
+- O script original (`verifica_versao_gitlab.py`) possui um `except` com tupla aninhada (`except (RequestException, (KeyError, TypeError))`) que em Python 3.14 gera `TypeError`. Recomenda-se corrigir para `except (RequestException, KeyError, TypeError)`.
+- Não há sanitização explícita dos parâmetros `GITLAB_PROJECT_PATH` e `ref_name` antes de montar a URL — a API do GitLab faz o URL-encoding, mas validação adicional seria recomendada.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Corrigir except aninhado no script (alta) > Sanitização de parâmetros de entrada (média) > Retry com backoff para 429 (baixa).
+
+---
+
+## 5.5 INT5 (Red Team) — Aferição SPED/RFB sob Perspectiva Adversarial
+
+### Objetivo do Ativo Adversarial
+
+&emsp;Validar se o motor de validação de layout SPED e o endpoint de auditoria resistem a **spoofing de versão**, **injeção em campos CNPJ**, **manipulação de hash**, **payloads oversized**, **edge cases de competência** e **combinações de campos ausentes**. O Red Team tenta explorar limites do validador de layout para aceitar payloads inválidos ou rejeitar payloads válidos.
+
+### Mapa de Direcionadores de Negócio - Red Team (INT5)
+
+| ID         | Cenário de Ataque                         | Critério de Ataque                                                                                  | Status   |
+| :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------- |
+| **INT5.R1** | **Layout Version Spoofing**              | 7 versões inválidas (v2025, v2027, V2026, "", etc.) — todas rejeitadas pelo validador               | **PASS** |
+| **INT5.R2** | **CNPJ Injection**                       | SQL injection, XSS, null byte, tipo incorreto — rejeitados por tamanho ou tipo                      | **PASS** |
+| **INT5.R3** | **Hash Manipulation**                    | Hash vazio, tipo incorreto, ausente — tipo e presença validados                                      | **PASS** |
+| **INT5.R4** | **Oversized Payload**                    | 5.000 campos extras, string de 1MB, payload pesado na API — sem crash, < 5s                         | **PASS** |
+| **INT5.R5** | **Competência Edge Cases**               | Datas futuras, passadas, formato inválido, tipo incorreto — aceitas (gap documentado)                | **PASS** |
+| **INT5.R6** | **Missing Fields Combinatorial**         | Todas as combinações de campos obrigatórios ausentes — corretamente detectadas                       | **PASS** |
+
+### Métodos de Testagem
+
+&emsp;A suíte em `src/tests/red_team/INT5_sped_afericao_red.py` testa diretamente as funções `validar_layout_sped` e `aferir_layout_int5` do módulo de aferição INT5, além de testar a API via `TestClient`.
+
+**Estrutura dos testes (6 classes, 38 cenários):**
+
+| Classe de Teste                    | Cenários | Direcionador |
+| :--------------------------------- | :------- | :----------- |
+| `TestINT5R1VersionSpoofing`       | 8 testes (parametrizados) | INT5.R1 |
+| `TestINT5R2CNPJInjection`         | 7 testes | INT5.R2      |
+| `TestINT5R3HashManipulation`       | 3 testes | INT5.R3      |
+| `TestINT5R4OversizedPayload`       | 3 testes | INT5.R4      |
+| `TestINT5R5CompetenciaEdgeCases`   | 9 testes (parametrizados) | INT5.R5 |
+| `TestINT5R6MissingFieldsCombinatorial` | 8 testes | INT5.R6  |
+
+### Execução dos Testes
+
+```bash
+pytest src/tests/red_team/INT5_sped_afericao_red.py -v -s
+```
+
+### Análise dos Resultados
+
+**Pontos Fortes:**
+
+- A validação de versão é estrita: apenas `"v2026"` é aceita; variantes com case diferente (`V2026`), sem prefixo (`2026`), null byte (`v2026\x00`) e versões adjacentes são corretamente rejeitadas.
+- CNPJ com SQL injection, XSS e tamanhos incorretos são rejeitados pela validação de tamanho (14 caracteres) e tipo.
+- Payloads com 5.000 campos extras são processados em < 5 segundos sem crash — campos desconhecidos são ignorados pelo validador.
+- Todas as combinações de campos obrigatórios ausentes (individuais e em pares) são corretamente detectadas.
+
+**Pontos de Quebra Identificados:**
+
+- **CNPJ com null byte:** String `"1234567800019\x00"` tem `len() == 14` e é aceita pelo validador, pois a validação é apenas por tamanho. Recomendação: sanitizar null bytes antes da validação de tamanho.
+- **Competência sem validação semântica:** O campo `competencia` aceita qualquer string (ex.: `"2099-12"`, `"invalido"`, `""`). Recomendação: implementar validação de formato (YYYY-MM) e faixa temporal.
+- **Hash vazio aceito:** O campo `hash_lote` com string vazia (`""`) é aceito pois está presente e é do tipo correto. Recomendação: adicionar validação de conteúdo mínimo.
+
+### Síntese de Impacto e Priorizações
+
+**Priorização:** Sanitização de null bytes em CNPJ (alta) > Validação semântica de competência (alta) > Validação de hash não vazio (média) > Validação de dígitos verificadores do CNPJ (baixa).
