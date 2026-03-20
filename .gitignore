@@ -22,6 +22,10 @@ pip-delete-this-directory.txt
 reports/*.html
 reports/*.json
 *.log
+debug-*.log
+
+# --- OBSERVABILIDADE (Prometheus, etc.) ---
+prometheus_data/
 .pytest_cache/
 .coverage
 htmlcov/

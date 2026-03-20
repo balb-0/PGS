@@ -9,15 +9,10 @@ Valida autenticacao em endpoints protegidos:
 - isolamento entre tenants
 """
 
-import sys
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from core.api import app, audit_log, transaction_history, clear_replay_cache
+from src.core.api import app, audit_log, transaction_history, clear_replay_cache
 
 
 client = TestClient(app)

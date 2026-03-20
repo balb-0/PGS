@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-# Carrega .env da raiz do projeto
-_repo_root = Path(__file__).resolve().parent.parent.parent
+# Carrega .env da raiz do projeto (src/tests/blue_team -> parent^4 = g06)
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent
 _env_path = _repo_root / ".env"
 if _env_path.exists():
     try:
@@ -30,7 +30,7 @@ if _env_path.exists():
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
-from scripts.verifica_versao_gitlab import (
+from src.scripts.verifica_versao_gitlab import (
     verificar_protocolo_gitlab,
     get_ultimo_commit,
     verificar_sincronismo,
