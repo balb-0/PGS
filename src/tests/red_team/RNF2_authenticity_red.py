@@ -28,6 +28,8 @@ from dotenv import load_dotenv
 _load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
 load_dotenv(_load_env_path)
 
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
 if BASE_URL:
     class _RealAPIClient:
@@ -49,7 +51,7 @@ if BASE_URL:
     client = _RealAPIClient()
 else:
     from fastapi.testclient import TestClient
-    from src.core.api import app
+    from core.api import app
     client = TestClient(app)
 
 HEADERS_VALIDOS = {
@@ -280,7 +282,7 @@ class TestRNF2R6CrossEndpoint:
 
     def test_rnf2_r6_credenciais_validas_funcionam_em_todos_endpoints_protegidos(self):
         """O mesmo par de credenciais validas funciona em todos os endpoints."""
-        from src.core.api import clear_replay_cache
+        from core.api import clear_replay_cache
 
         resp1 = client.post("/api/v1/auditar", json=PAYLOAD_VALIDO, headers=HEADERS_VALIDOS)
         assert resp1.status_code == 201

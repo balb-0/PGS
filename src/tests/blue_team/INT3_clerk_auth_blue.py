@@ -20,8 +20,10 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.core.api import app, audit_log, transaction_history, clear_replay_cache
-from src.core.auth_clerk import JWKSCache, override_jwks_cache
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from core.api import app, audit_log, transaction_history, clear_replay_cache
+from core.auth_clerk import JWKSCache, override_jwks_cache
 
 
 client = TestClient(app)

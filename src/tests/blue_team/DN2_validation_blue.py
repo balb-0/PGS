@@ -9,8 +9,13 @@ de dados na ingestão de documentos fiscais.
 
 import pytest
 from fastapi.testclient import TestClient
+import sys
+from pathlib import Path
 
-from src.core.api import app
+# Adicionar o caminho ao src para importar a api
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from core.api import app
 
 # Cliente de teste para a API
 client = TestClient(app)

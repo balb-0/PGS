@@ -1,11 +1,6 @@
-from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path, Depends, Request
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path, Depends
 from typing import Dict, Any, List, Optional
 import uuid
-import time
-import re
-
-from . import metrics as prom_metrics
 import asyncio
 import random
 import os
@@ -72,7 +67,6 @@ def validar_destino(modulo_fiscal: str) -> str:
     - Retorna o valor normalizado em uppercase quando valido.
     """
     if not isinstance(modulo_fiscal, str):
-        prom_metrics.record_validation_error("invalid_type", "destino")
         raise HTTPException(
             status_code=400,
             detail=f"Modulo fiscal de destino invalido. Modulos aceitos: {sorted(MODULOS_FISCAIS_VALIDOS)}",
@@ -80,7 +74,6 @@ def validar_destino(modulo_fiscal: str) -> str:
 
     destino_normalizado = modulo_fiscal.upper()
     if destino_normalizado not in MODULOS_FISCAIS_VALIDOS:
-        prom_metrics.record_validation_error("invalid_destino", "destino")
         raise HTTPException(
             status_code=400,
             detail=f"Modulo fiscal de destino invalido. Modulos aceitos: {sorted(MODULOS_FISCAIS_VALIDOS)}",
@@ -215,11 +208,6 @@ class ProcessStore:
         with self._lock:
             return self._processes.get(tracking_id)
 
-    def size(self) -> int:
-        """Retorna a quantidade de processos armazenados (para métricas)."""
-        with self._lock:
-            return len(self._processes)
-
     def update_status(
         self,
         tracking_id: str,
@@ -291,20 +279,6 @@ class RateLimiter:
     @property
     def window_seconds(self) -> float:
         return self._window
-
-    def get_remaining_for_all_accounts(self) -> Dict[str, int]:
-        """Retorna {account_key_hash: remaining} para métricas Prometheus.
-        account_key_hash é SHA-256 truncado a 16 chars para privacidade."""
-        now = time.time()
-        cutoff = now - self._window
-        result: Dict[str, int] = {}
-        with self._lock:
-            for account_key, timestamps in list(self._requests.items()):
-                active = [t for t in timestamps if t > cutoff]
-                rem = max(0, self._max_requests - len(active))
-                key_hash = hashlib.sha256(account_key.encode()).hexdigest()[:16]
-                result[key_hash] = rem
-        return result
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -1149,71 +1123,12 @@ seasonality_analyzer = SeasonalityAnalyzer()
 
 app = FastAPI(title="API_G6 - ASIS TaxTech (Unified Proxy & Mock Fallback)", version="2.0.0")
 
-
-# =============================================================================
-# T3 — Middleware de Instrumentação Prometheus (endpoint, method, status, source)
-# =============================================================================
-
-def _normalize_path(path: str) -> str:
-    """Normaliza path para reduzir cardinalidade nas métricas Prometheus."""
-    parts = path.strip("/").split("/")
-    normalized = []
-    for p in parts:
-        if re.match(r"^\d+$", p):
-            normalized.append("{id}")
-        elif re.match(
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", p, re.I
-        ):
-            normalized.append("{uuid}")
-        elif re.match(r"^[a-f0-9]{16,64}$", p, re.I):
-            normalized.append("{hash}")
-        else:
-            normalized.append(p)
-    return "/" + "/".join(normalized) if normalized else "/"
-
-
-def _status_label(status_code: int) -> str:
-    """Mapeia status HTTP para label de métrica."""
-    if 200 <= status_code < 300:
-        return "success"
-    if status_code == 400:
-        return "validation_error"
-    return "error"
-
-
-class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
-    """Middleware que registra requisições nas métricas Prometheus (DN1, T3)."""
-
-    async def dispatch(self, request: Request, call_next):
-        start = time.perf_counter()
-        response = await call_next(request)
-        duration = time.perf_counter() - start
-
-        endpoint = _normalize_path(request.url.path)
-        method = request.method
-        status = _status_label(response.status_code)
-        source = getattr(request.state, "source", "mock")
-
-        prom_metrics.record_request(
-            endpoint=endpoint,
-            method=method,
-            duration_seconds=duration,
-            status=status,
-            source=source,
-        )
-
-        return response
-
-
-app.add_middleware(PrometheusMetricsMiddleware)
-
 # =============================================================================
 # ASIS API PURE PROXIES (REAL ENDPOINTS FALLBACK)
 # =============================================================================
 
 @app.post("/api/v1/upload", status_code=200)
 async def upload_multipart_proxy(
-    request: Request,
     auth: Dict[str, str] = Depends(authenticate_request),
     file: UploadFile = File(...)
 ):
@@ -1238,11 +1153,9 @@ async def upload_multipart_proxy(
         data = r.json()
         if isinstance(data, dict):
             data["diagnostico"] = "Conforme (Real API ASIS)"
-        request.state.source = "real"
         return data
     except Exception as e:
         print(f"[FALLBACK PROXY] Erro no upload multipart real: {e}")
-        request.state.source = "mock"
         return {
             "processos": [
                  {
@@ -1256,7 +1169,6 @@ async def upload_multipart_proxy(
 
 @app.post("/api/v1/upload/base64", status_code=200)
 async def upload_base64_proxy(
-    request: Request,
     auth: Dict[str, str] = Depends(authenticate_request),
     payload: Dict[str, Any] = Body(...)
 ):
@@ -1280,11 +1192,9 @@ async def upload_base64_proxy(
         data = r.json()
         if isinstance(data, dict):
             data["diagnostico"] = "Conforme (Real API ASIS)"
-        request.state.source = "real"
         return data
     except Exception as e:
         print(f"[FALLBACK PROXY] Erro no upload base64 real: {e}")
-        request.state.source = "mock"
         return {
             "processos": [
                  {
@@ -1297,7 +1207,6 @@ async def upload_base64_proxy(
 
 @app.get("/api/v1/processo/{process_id}", status_code=200)
 async def get_processo_status_proxy(
-    request: Request,
     process_id: int,
     auth: Dict[str, str] = Depends(authenticate_request)
 ):
@@ -1319,11 +1228,9 @@ async def get_processo_status_proxy(
         data = r.json()
         if isinstance(data, dict):
             data["diagnostico_proxy"] = "Conforme (Real API ASIS)"
-        request.state.source = "real"
         return data
     except Exception as e:
         print(f"[FALLBACK PROXY] Erro GET processo real: {e}")
-        request.state.source = "mock"
         return {
             "id": process_id,
             "status": 201, # 201 indica processo finalizado
@@ -1334,7 +1241,6 @@ async def get_processo_status_proxy(
 
 @app.get("/api/v1/resultado/processo/{process_id}", status_code=200)
 async def get_resultado_proxy(
-    request: Request,
     process_id: int,
     auth: Dict[str, str] = Depends(authenticate_request)
 ):
@@ -1354,11 +1260,9 @@ async def get_resultado_proxy(
         )
         r.raise_for_status()
         data = r.json()
-        request.state.source = "real"
         return data
     except Exception as e:
         print(f"[FALLBACK PROXY] Erro GET resultado real: {e}")
-        request.state.source = "mock"
         return {
             "arquivos": [{"id": 123, "nome": "relatorio.txt", "url": "mock_url"}],
             "indicadores": [],
@@ -1367,7 +1271,6 @@ async def get_resultado_proxy(
 
 @app.get("/api/v1/resultado/processo/{process_id}/auditoria/{auditoria_id}", status_code=200)
 async def get_auditoria_resultado_proxy(
-    request: Request,
     process_id: int,
     auditoria_id: int,
     auth: Dict[str, str] = Depends(authenticate_request)
@@ -1388,11 +1291,9 @@ async def get_auditoria_resultado_proxy(
         )
         r.raise_for_status()
         data = r.json()
-        request.state.source = "real"
         return data
     except Exception as e:
         print(f"[FALLBACK PROXY] Erro GET resultado auditoria real: {e}")
-        request.state.source = "mock"
         return {
             "auditoriaId": auditoria_id,
             "detalhes": "Nenhum erro encontrado no Mock.",
@@ -1404,7 +1305,6 @@ async def get_auditoria_resultado_proxy(
 
 @app.post("/api/v1/auditar", status_code=201)
 async def processar_auditoria(
-    request: Request,
     auth: Dict[str, str] = Depends(authenticate_request),
     payload: Dict[str, Any] = Body(...)
 ):
@@ -1424,15 +1324,13 @@ async def processar_auditoria(
 
     # DN2.1: Validar presença de campos obrigatórios
     # DN2.3: Erros retornam HTTP 400 sem processamento
+    # Nota: Campos devem estar presentes (não None) e ter valores válidos
     if sessao is None or modulo_fiscal is None or volume_docs is None:
-        missing = [f for f, v in [("sessao_cliente", sessao), ("valor", volume_docs), ("destino", modulo_fiscal)] if v is None]
-        prom_metrics.record_validation_error("missing_fields", ",".join(missing))
         raise HTTPException(status_code=400, detail="Parâmetros obrigatórios ausentes")
 
     # DN2.2: Validar que "valor" é maior que zero
     # DN2.3: Erros retornam HTTP 400 sem processamento
     if not isinstance(volume_docs, (int, float)) or math.isnan(volume_docs) or math.isinf(volume_docs) or volume_docs <= 0 or volume_docs > 1e100:
-        prom_metrics.record_validation_error("invalid_value", "valor")
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
 
     # RF2: Validar módulo fiscal de destino (case-insensitive, fail-fast)
@@ -1456,7 +1354,6 @@ async def processar_auditoria(
             status=ProcessStatus.CONCLUIDO,
         )
 
-        request.state.source = "real"
         return {
             "id": real_process_id,
             "status": 201,
@@ -1474,7 +1371,6 @@ async def processar_auditoria(
     except Exception as e:
         # FALLBACK PARA O MOCK
         print(f"[FALLBACK] Erro na API real: {str(e)}")
-        request.state.source = "mock"
         await asyncio.sleep(random.uniform(0.01, 0.1))
 
         # DN2.4: Gerar tracking_id apenas para payloads válidos (sem processamento em erro)
@@ -1531,39 +1427,8 @@ async def health_check():
     return status
 
 
-@app.get("/metrics", status_code=200)
-async def prometheus_metrics():
-    """
-    Endpoint de métricas Prometheus (DN1-DN4, Dashboard da Qualidade).
-
-    Expõe métricas de latência, requisições, validação, disponibilidade,
-    circuit breaker, rate limit, log de auditoria e stores.
-    """
-    health_status = health_checker.get_status()
-    cb_state = circuit_breaker.state.value
-    rate_remaining = rate_limiter.get_remaining_for_all_accounts()
-    proc_size = process_store.size()
-    audit_size = audit_log.size()
-    idem_size = idempotency_store.size()
-
-    prom_metrics.update_gauges_from_state(
-        health_status=health_status,
-        circuit_state=cb_state,
-        rate_limit_remaining_by_account=rate_remaining,
-        process_store_size=proc_size,
-        audit_log_size=audit_size,
-        idempotency_store_size=idem_size,
-    )
-
-    return Response(
-        content=prom_metrics.get_metrics_output(),
-        media_type=prom_metrics.get_content_type(),
-    )
-
-
 @app.post("/api/v1/auditar/resilient", status_code=201)
 async def processar_auditoria_resiliente(
-    request: Request,
     auth: Dict[str, str] = Depends(authenticate_request),
     idempotency_key: str = Header(None),
     payload: Dict[str, Any] = Body(...)
@@ -1613,14 +1478,11 @@ async def processar_auditoria_resiliente(
     modulo_fiscal = payload.get("destino")
 
     if sessao is None or modulo_fiscal is None or volume_docs is None:
-        missing = [f for f, v in [("sessao_cliente", sessao), ("valor", volume_docs), ("destino", modulo_fiscal)] if v is None]
-        prom_metrics.record_validation_error("missing_fields", ",".join(missing))
         health_checker.record_request(success=False)
         circuit_breaker.record_failure()
         raise HTTPException(status_code=400, detail="Parâmetros obrigatórios ausentes")
 
     if not isinstance(volume_docs, (int, float)) or math.isnan(volume_docs) or math.isinf(volume_docs) or volume_docs <= 0:
-        prom_metrics.record_validation_error("invalid_value", "valor")
         health_checker.record_request(success=False)
         circuit_breaker.record_failure()
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
@@ -1651,7 +1513,6 @@ async def processar_auditoria_resiliente(
             transaction_id = random.randint(20000, 30000)
             diagnostico = "Conforme (Fallback Mock)"
 
-        request.state.source = "real" if "Real" in diagnostico else "mock"
         response_data = {
             "id": transaction_id,
             "status": 201,
@@ -1706,7 +1567,6 @@ async def processar_auditoria_resiliente(
 
 @app.post("/api/v1/auditar/nr", status_code=201)
 async def processar_auditoria_nr(
-    request: Request,
     auth: Dict[str, str] = Depends(authenticate_request),
     payload: Dict[str, Any] = Body(...)
 ):
@@ -1728,12 +1588,9 @@ async def processar_auditoria_nr(
     modulo_fiscal = payload.get("destino")
 
     if sessao is None or modulo_fiscal is None or volume_docs is None:
-        missing = [f for f, v in [("sessao_cliente", sessao), ("valor", volume_docs), ("destino", modulo_fiscal)] if v is None]
-        prom_metrics.record_validation_error("missing_fields", ",".join(missing))
         raise HTTPException(status_code=400, detail="Parâmetros obrigatórios ausentes")
 
     if not isinstance(volume_docs, (int, float)) or math.isnan(volume_docs) or math.isinf(volume_docs) or volume_docs <= 0 or volume_docs > 1e100:
-        prom_metrics.record_validation_error("invalid_value", "valor")
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
 
     # RF2: Validar módulo fiscal de destino (case-insensitive, fail-fast)
@@ -1775,14 +1632,12 @@ async def processar_auditoria_nr(
         tracking_id = str(real_process_id)
         transaction_id = real_process_id
         diagnostico = "Conforme (Real API ASIS)"
-        request.state.source = "real"
     except Exception as e:
         print(f"[FALLBACK] Erro na API real (NR): {str(e)}")
         await asyncio.sleep(random.uniform(0.01, 0.1))
         tracking_id = str(uuid.uuid4())
         transaction_id = random.randint(20000, 30000)
         diagnostico = "Conforme (Fallback Mock)"
-        request.state.source = "mock"
 
     # --- Gerar dados base da transação ---
 
@@ -1799,12 +1654,9 @@ async def processar_auditoria_nr(
     # --- DN4.6: Verificação de alertas ---
     alert = check_alert(receipt)
     chain_alert = check_chain_alert(audit_log)
-    if chain_alert is not None:
-        prom_metrics.record_nr_alert("chain")
 
     # --- DN4.5: Registro no log de auditoria com cadeia de hash ---
     log_entry = audit_log.append(receipt)
-    prom_metrics.record_audit_log_entry()
 
     # --- RNF1: Registrar transação no histórico para análise de sazonalidade ---
     transaction_record = {
@@ -1941,8 +1793,6 @@ async def processar_disputa_nr(
 
     # --- RNF1.5: Emissão de Alerta ---
     dispute_alert = check_dispute_alert(verdict)
-    if dispute_alert is not None:
-        prom_metrics.record_nr_alert("dispute")
 
     # --- Verificar integridade do recibo original ---
     original_receipt = disputed_tx.get("receipt")
@@ -2022,8 +1872,6 @@ async def get_audit_log(
 
     chain_valid = audit_log.verify_chain()
     chain_alert = check_chain_alert(audit_log)
-    if chain_alert is not None:
-        prom_metrics.record_nr_alert("chain")
 
     return {
         "total_entries": audit_log.size(),
@@ -2054,7 +1902,6 @@ async def get_audit_log_entry(
 
 @app.post("/api/v1/auditar/clerk", status_code=201)
 async def processar_auditoria_clerk(
-    request: Request,
     payload: Dict[str, Any] = Body(...),
     authorization: Optional[str] = Header(default=None),
     account_key: Optional[str] = Header(default=None),
@@ -2084,12 +1931,9 @@ async def processar_auditoria_clerk(
     modulo_fiscal = payload.get("destino")
 
     if sessao is None or modulo_fiscal is None or volume_docs is None:
-        missing = [f for f, v in [("sessao_cliente", sessao), ("valor", volume_docs), ("destino", modulo_fiscal)] if v is None]
-        prom_metrics.record_validation_error("missing_fields", ",".join(missing))
         raise HTTPException(status_code=400, detail="Parâmetros obrigatórios ausentes")
 
     if not isinstance(volume_docs, (int, float)) or math.isnan(volume_docs) or math.isinf(volume_docs) or volume_docs <= 0 or volume_docs > 1e100:
-        prom_metrics.record_validation_error("invalid_value", "valor")
         raise HTTPException(status_code=400, detail="Valor deve ser um número maior que zero")
 
     # RF2: Validar módulo fiscal de destino
@@ -2107,14 +1951,12 @@ async def processar_auditoria_clerk(
         tracking_id = str(real_process_id)
         transaction_id = real_process_id
         diagnostico = "Conforme (Real API ASIS)"
-        request.state.source = "real"
     except Exception as e:
         print(f"[FALLBACK INT3] Erro na API real: {str(e)}")
         await asyncio.sleep(random.uniform(0.01, 0.1))
         tracking_id = str(uuid.uuid4())
         transaction_id = random.randint(20000, 30000)
         diagnostico = "Conforme (Fallback Mock)"
-        request.state.source = "mock"
 
     # --- DN4.1: Assinatura digital HMAC-SHA256 ---
     signature = sign_transaction(payload, timestamp)
@@ -2127,7 +1969,6 @@ async def processar_auditoria_clerk(
 
     # --- DN4.5: Registro no log de auditoria ---
     log_entry = audit_log.append(receipt)
-    prom_metrics.record_audit_log_entry()
 
     # --- RNF1: Registrar no histórico de transações por tenant (isolamento INT3) ---
     transaction_record = {

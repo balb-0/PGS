@@ -151,8 +151,6 @@
     - [4.4.4 Como se conectar ao serviço](#444-como-se-conectar-ao-serviço)
     - [4.4.5 Função de verificação do protocolo](#445-função-de-verificação-do-protocolo)
     - [4.4.6 Testes](#446-testes)
-- [6. Dashboard e Observabilidade](#6-dashboard-e-observabilidade)
-  - [6.1 Prometheus](#61-prometheus)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -2541,13 +2539,13 @@ Na raiz do repositório:
 
 ```bash
 # Saída legível (status + commits)
-python src/scripts/verifica_versao_gitlab.py
+python scripts/verifica_versao_gitlab.py
 
 # Saída em JSON (para cron/automação)
-python src/scripts/verifica_versao_gitlab.py --json
+python scripts/verifica_versao_gitlab.py --json
 
 # Apenas verificação do protocolo da API (não compara commits)
-python src/scripts/verifica_versao_gitlab.py --apenas-protocolo
+python scripts/verifica_versao_gitlab.py --apenas-protocolo
 ```
 
 **Exit code:** `0` quando produção e homologação estão na mesma versão; `1` quando estão diferentes ou há erro.
@@ -2557,12 +2555,12 @@ python src/scripts/verifica_versao_gitlab.py --apenas-protocolo
 Exemplo para rodar a cada hora e registrar o resultado:
 
 ```bash
-0 * * * * cd /caminho/para/repo && python src/scripts/verifica_versao_gitlab.py --json >> /var/log/gitlab_sync.log 2>&1
+0 * * * * cd /caminho/para/repo && python scripts/verifica_versao_gitlab.py --json >> /var/log/gitlab_sync.log 2>&1
 ```
 
 ### 4.4.5 Função de verificação do protocolo
 
-A função **`verificar_protocolo_gitlab()`** (em `src/scripts/verifica_versao_gitlab.py`):
+A função **`verificar_protocolo_gitlab()`** (em `scripts/verifica_versao_gitlab.py`):
 
 1. Chama `GET /projects/:id` para validar acesso ao projeto e que a API está respondendo.
 2. Chama `GET /projects/:id/repository/commits?ref_name=main&per_page=1` e valida que a resposta é uma lista de commits com campos `id` e `title`.
@@ -2899,101 +2897,3 @@ pytest src/tests/red_team/INT5_sped_afericao_red.py -v -s
 ### Síntese de Impacto e Priorizações
 
 **Priorização:** Sanitização de null bytes em CNPJ (alta) > Validação semântica de competência (alta) > Validação de hash não vazio (média) > Validação de dígitos verificadores do CNPJ (baixa).
-
----
-
-## 6. Dashboard e Observabilidade
-
-### 6.1 Prometheus
-
-A API ASIS TaxTech integra o **Prometheus** para coleta de métricas alinhadas aos Direcionadores de Negócio (DN1–DN4), Requisitos Funcionais (RF1, RF2) e Requisitos Não Funcionais (RNF1). O Prometheus faz scrape periódico dos endpoints de métricas e alimenta regras de alerta e dashboards (ex.: Grafana).
-
-#### Endpoints definidos
-
-| Endpoint | Porta | Descrição |
-|----------|-------|-----------|
-| `GET /metrics` | 8000 | Métricas Prometheus da API ASIS (latência, requisições, health, circuit breaker, rate limit, audit log). Formato texto Prometheus, sem autenticação. |
-| `GET /metrics` | 9092 | Exporter de métricas pytest (`pytest_tests_total`, `pytest_tests_passed`). Servidor em `src/scripts/pytest_metrics_exporter.py`. |
-
-#### Métricas expostas (DN1–DN4, RF1, RNF1)
-
-| Categoria | Métricas | Uso |
-|------------|----------|-----|
-| **DN1 Latência** | `asis_request_duration_seconds`, `asis_requests_total` | Histograma e contador por endpoint, method, status, source |
-| **DN2 Integridade** | `asis_validation_errors_total` | Erros de validação (HTTP 400) |
-| **DN3 Disponibilidade** | `asis_health_uptime_seconds`, `asis_health_error_rate_percent`, `asis_circuit_breaker_state`, `asis_rate_limit_remaining` | Health, circuit breaker, rate limit |
-| **DN4 Não-Repúdio** | `asis_audit_log_entries_total`, `asis_audit_log_size`, `asis_nr_alerts_total` | Log de auditoria e alertas |
-| **Registros** | `asis_process_store_size`, `asis_idempotency_store_size` | Tamanho dos stores |
-| **Capacidade** | `asis_concurrent_requests` | Requisições concorrentes |
-
-Referência completa: `docs/catalogo_servicos_monitorados.md`.
-
-#### Passos para rodar os servidores
-
-**Ordem recomendada:**
-
-1. **API ASIS** (porta 8000):
-   ```powershell
-   cd g06
-   uvicorn src.core.api:app --host 0.0.0.0 --port 8000
-   ```
-
-2. **Exporter pytest** (porta 9092, opcional):
-   ```powershell
-   python src/scripts/pytest_metrics_exporter.py
-   ```
-
-3. **Prometheus e Alertmanager** (portas 9090 e 9093): via Docker Compose (ver seção seguinte).
-
-#### Docker Compose
-
-O stack Prometheus + Alertmanager sobe com:
-
-```powershell
-cd g06
-docker-compose up -d
-```
-
-- **Prometheus:** http://localhost:9090 (targets, graph, alerts)
-- **Alertmanager:** http://localhost:9093
-
-O `docker-compose` usa `prometheus.docker.standalone.yml`, que faz scrape em `host.docker.internal:8000` e `host.docker.internal:9092`. Se o Alertmanager impedir o início do Prometheus, use a versão standalone (alerting comentado) ou suba o Alertmanager antes.
-
-#### Exemplos de queries PromQL
-
-| Objetivo | Query |
-|----------|-------|
-| Taxa de requisições (últimos 5 min) | `rate(asis_requests_total[5m])` |
-| Latência P95 por endpoint | `histogram_quantile(0.95, sum(rate(asis_request_duration_seconds_bucket[5m])) by (le, endpoint))` |
-| Latência P90 (SLA DN1) | `histogram_quantile(0.9, sum(rate(asis_request_duration_seconds_bucket[5m])) by (le))` |
-| Taxa de erro (DN3) | `asis_health_error_rate_percent` |
-| Estado do circuit breaker | `asis_circuit_breaker_state` |
-| Tamanho do ProcessStore | `asis_process_store_size` |
-| Tamanho do AuditLog | `asis_audit_log_size` |
-| Status do target da API | `up{job="asis_api"}` |
-| Total de requisições | `asis_requests_total` |
-
-#### Regras de alerta
-
-As regras em `rules.yml` incluem: **HighLatency** (P90 > 650ms), **SLAViolation** (P90 > 500ms), **HighErrorRate** (> 30%), **CircuitBreakerOpen**, **RateLimitLow**, **AuditChainAlert**. O `alertmanager.yml` roteia por severidade (critical, warning).
-
-#### Alertmanager
-
-O **Alertmanager** recebe alertas disparados pelo Prometheus, agrupa, deduplica e encaminha notificações para os receivers configurados. Interface web: http://localhost:9093.
-
-**Roteamento:**
-
-| Severidade | Receiver | Alertas encaminhados |
-|------------|----------|----------------------|
-| `critical` | `critical` | SLAViolation (DN1), CircuitBreakerOpen (DN3), AuditChainAlert (DN4) |
-| `warning` | `warning` | HighLatency (DN1), HighErrorRate (DN3), RateLimitLow (DN3) |
-| Demais | `default` | Agrupamento sem notificação externa |
-
-**Configuração (`alertmanager.yml`):**
-
-- `group_by`: `['alertname', 'severity']` — agrupa alertas pelo nome e severidade
-- `group_wait`: 30s — espera antes de enviar o primeiro grupo
-- `group_interval`: 5m — intervalo entre envios de grupos
-- `repeat_interval`: 5m — intervalo para reenviar alertas ainda ativos
-
-**Receivers:** Os receivers `default`, `critical` e `warning` estão definidos sem canais de notificação (webhook, Slack, email). Para ativar envio, adicione em `alertmanager.yml` exemplos como `webhook_configs`, `slack_configs` ou `email_configs` em cada receiver.

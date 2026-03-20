@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 _load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
 load_dotenv(_load_env_path)
 
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
 if BASE_URL:
     class _RealAPIClient:
@@ -40,12 +42,12 @@ if BASE_URL:
     client = _RealAPIClient()
 else:
     from fastapi.testclient import TestClient
-    from src.core.api import app  # noqa: E402
+    from core.api import app  # noqa: E402
     client = TestClient(app)
 
-from src.core.api import app  # noqa: E402
-import src.core.api as mock_api_module  # noqa: E402
-from src.core.api import (  # noqa: E402
+from core.api import app  # noqa: E402
+import core.api as mock_api_module  # noqa: E402
+from core.api import (  # noqa: E402
     rate_limiter,
     circuit_breaker,
     health_checker,
