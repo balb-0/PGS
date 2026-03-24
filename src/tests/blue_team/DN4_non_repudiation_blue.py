@@ -29,11 +29,8 @@ from fastapi.testclient import TestClient
 import sys
 from pathlib import Path
 
-# Adicionar o caminho ao src para importar os módulos
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from core.api import app
-from core.api import (
+from src.core.api import app
+from src.core.api import (
     sign_transaction,
     verify_signature,
     generate_timestamp,
@@ -81,7 +78,7 @@ ITERACOES = [1, 2, 3]
 @pytest.fixture(autouse=True)
 def setup_teardown():
     """Isola as configurações globais antes de cada cenário de teste."""
-    from core.api import clear_replay_cache
+    from src.core.api import clear_replay_cache
     audit_log.clear()
     clear_replay_cache()
     yield

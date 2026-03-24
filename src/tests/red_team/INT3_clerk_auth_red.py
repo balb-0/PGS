@@ -32,8 +32,6 @@ from dotenv import load_dotenv
 _load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
 load_dotenv(_load_env_path)
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
 if BASE_URL:
     class _RealAPIClient:
@@ -55,11 +53,11 @@ if BASE_URL:
     client = _RealAPIClient()
 else:
     from fastapi.testclient import TestClient
-    from core.api import app
+    from src.core.api import app
     client = TestClient(app)
 
-from core.api import audit_log, transaction_history, clear_replay_cache
-from core.auth_clerk import JWKSCache
+from src.core.api import audit_log, transaction_history, clear_replay_cache
+from src.core.auth_clerk import JWKSCache
 
 HEADERS_ALPHA = {
     "account-key": "tenant-alpha-account",
