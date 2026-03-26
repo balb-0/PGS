@@ -1,10 +1,13 @@
-# Docker Compose - Stack Prometheus para API ASIS TaxTech
-# Ref: docs/plano_integracao_prometheus.md (T11)
+# Docker Compose - Stack Prometheus + Grafana para API ASIS TaxTech
+# Ref: docs/plano_integracao_prometheus.md (T11, T13)
 #
-# Uso: docker-compose up -d
-# Prometheus: http://localhost:9090/targets
-# Se falhar, use: docker-compose run --rm -p 9090:9090 prometheus
-#   com volume: -v ${PWD}/prometheus.docker.standalone.yml:/etc/prometheus/prometheus.yml
+# Uso:
+#   docker-compose up -d
+#
+# Endpoints:
+#   Prometheus:  http://localhost:9090/targets
+#   Alertmanager: http://localhost:9093
+#   Grafana:     http://localhost:3000  (admin / admin)
 
 services:
   prometheus:
@@ -30,3 +33,18 @@ services:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: asis-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
