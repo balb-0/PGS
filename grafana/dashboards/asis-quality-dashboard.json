@@ -619,7 +619,7 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "ASIS TaxTech — Dashboard da Qualidade",
+  "title": "ASIS TaxTech — Dashboard da Qualidade (LEGACY)",
   "uid": "asis-quality-dashboard",
   "version": 1
 }

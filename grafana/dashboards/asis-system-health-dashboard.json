@@ -1,0 +1,329 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "enable": true,
+        "expr": "ALERTS{alertstate=\"firing\"}",
+        "iconColor": "red",
+        "name": "Alerts",
+        "titleFormat": "{{ alertname }}"
+      }
+    ]
+  },
+  "description": "Dashboard tecnico de saude operacional para estabilidade, disponibilidade e resposta a incidente.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Negocio",
+      "type": "dashboards",
+      "uid": "asis-business-dashboard"
+    },
+    {
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Testes Restantes",
+      "type": "dashboards",
+      "uid": "asis-testing-gap-dashboard"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Saude Operacional do Sistema",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 50 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "Health Score",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "clamp_min(100 - asis_health_error_rate_percent, 0)",
+          "legendFormat": "Health Score"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 15 },
+              { "color": "red", "value": 30 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "Taxa de Erro",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "asis_health_error_rate_percent",
+          "legendFormat": "Error Rate"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Uptime",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "asis_health_uptime_seconds",
+          "legendFormat": "Uptime"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "CLOSED", "color": "green" },
+                "1": { "text": "OPEN", "color": "red" },
+                "2": { "text": "HALF_OPEN", "color": "yellow" }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Circuit Breaker",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(asis_circuit_breaker_state{state=\"OPEN\"}) * 1 + sum(asis_circuit_breaker_state{state=\"HALF_OPEN\"}) * 2",
+          "legendFormat": "State"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Tendencia de Error Rate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_health_error_rate_percent",
+          "legendFormat": "Error Rate %"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
+      "title": "Throughput por Endpoint",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(asis_requests_total{endpoint=~\"$endpoint\",source=~\"$source\"}[$interval])) by (endpoint)",
+          "legendFormat": "{{ endpoint }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 7,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Rate Limit por Conta",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_rate_limit_remaining{account_key_hash=~\"$account\"}",
+          "legendFormat": "{{ account_key_hash }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "id": 8,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Valor" }] },
+      "title": "Alertas Ativos",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "alertstate": true
+            },
+            "renameByName": {
+              "alertname": "Alerta",
+              "severity": "Severidade",
+              "dn": "DN",
+              "Value": "Valor"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "id": 9,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Capacidade dos Stores",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "asis_process_store_size", "legendFormat": "ProcessStore" },
+        { "expr": "asis_audit_log_size", "legendFormat": "AuditLog" },
+        { "expr": "asis_idempotency_store_size", "legendFormat": "IdempotencyStore" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "id": 10,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "textMode": "value" },
+      "title": "Contagem de Alertas Firing",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(ALERTS{alertstate=\"firing\"})",
+          "legendFormat": "Firing"
+        }
+      ]
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["asis", "health", "operations", "resilience"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "5m", "value": "5m" },
+        "label": "Intervalo",
+        "name": "interval",
+        "options": [
+          { "selected": false, "text": "30s", "value": "30s" },
+          { "selected": false, "text": "1m", "value": "1m" },
+          { "selected": true, "text": "5m", "value": "5m" },
+          { "selected": false, "text": "15m", "value": "15m" }
+        ],
+        "query": "30s,1m,5m,15m",
+        "type": "custom"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_requests_total, endpoint)",
+        "includeAll": true,
+        "label": "Endpoint",
+        "multi": true,
+        "name": "endpoint",
+        "query": "label_values(asis_requests_total, endpoint)",
+        "refresh": 2,
+        "type": "query",
+        "current": { "selected": true, "text": "All", "value": ".*" },
+        "allValue": ".*"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_requests_total, source)",
+        "includeAll": true,
+        "label": "Fonte",
+        "multi": true,
+        "name": "source",
+        "query": "label_values(asis_requests_total, source)",
+        "refresh": 2,
+        "type": "query",
+        "current": { "selected": true, "text": "All", "value": ".*" },
+        "allValue": ".*"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_rate_limit_remaining, account_key_hash)",
+        "includeAll": true,
+        "label": "Conta",
+        "multi": true,
+        "name": "account",
+        "query": "label_values(asis_rate_limit_remaining, account_key_hash)",
+        "refresh": 2,
+        "type": "query",
+        "current": { "selected": true, "text": "All", "value": ".*" },
+        "allValue": ".*"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "ASIS TaxTech - Dashboard de Saude do Sistema",
+  "uid": "asis-system-health-dashboard",
+  "version": 1,
+  "weekStart": ""
+}

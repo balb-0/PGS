@@ -41,6 +41,23 @@ Em um contexto **API First** na ASIS TaxTech, o desafio deste projeto é tratar 
 
 <a href="/docs/index.md">Link para a documentação geral</a> do projeto.
 
+## 📊 Dashboards Implementados
+
+O repositório adota **Grafana como camada principal de decisão** com 3 dashboards separados:
+
+- **Dashboard de Negócio**: `ASIS TaxTech - Dashboard de Negocio`
+- **Dashboard de Saúde do Sistema**: `ASIS TaxTech - Dashboard de Saude do Sistema`
+- **Dashboard de Testes Restantes**: `ASIS TaxTech - Dashboard de Testes Restantes`
+
+Esses dashboards são provisionados automaticamente via Docker em `grafana/dashboards/`.
+
+Novos endpoints backend para alimentar os dashboards:
+
+- `GET /api/v1/dashboard/business`
+- `GET /api/v1/dashboard/system-health`
+- `GET /api/v1/dashboard/testing-gap`
+- `GET /api/v1/dashboard/metadata`
+
 ## 📁 Estrutura de pastas
 
 ```
