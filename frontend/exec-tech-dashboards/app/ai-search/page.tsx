@@ -42,12 +42,13 @@ export default function AISearchPage() {
       <article className="panel reveal strategic-note">
         <h3>Como funciona</h3>
         <p>
-          Esta página busca em todos os gráficos existentes da plataforma e retorna apenas itens válidos do catálogo local,
-          sem criar novos painéis e sem alterar o render atual do Grafana.
+          Primero escreva o que deseja investigar e clique em "Buscar IA". A plataforma interpreta sua intenção e
+          seleciona os gráficos mais úteis já existentes no catálogo. Os painéis retornados aparecem abaixo, prontos
+          para análise, sem criar novos gráficos e sem alterar a forma atual de renderização do Grafana.
         </p>
       </article>
 
-      <SearchBar onResult={handleSearchResult} debounceMs={420} />
+      <SearchBar onResult={handleSearchResult} />
 
       {!searchResult ? (
         <div className="empty-state">Digite uma consulta para começar. Exemplo: "quero investigar erros por serviço".</div>

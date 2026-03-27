@@ -61,6 +61,89 @@ html.theme-animating .theme-toggle::after {
 
 .page-wrap { padding: 2rem clamp(1rem, 2vw, 3rem) 3rem; }
 
+.landing-wrap {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  gap: 1.4rem;
+}
+
+.landing-hero {
+  display: grid;
+  gap: 0.8rem;
+  text-align: center;
+  justify-items: center;
+  padding: 2rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(240, 175, 94, 0.2), transparent 45%),
+    radial-gradient(circle at 90% 80%, rgba(84, 208, 141, 0.18), transparent 40%),
+    linear-gradient(150deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(6px);
+}
+
+.landing-hero .subtitle {
+  max-width: 76ch;
+}
+
+.landing-cta-row {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.landing-cta {
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.62rem 0.95rem;
+  font-size: 0.86rem;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.landing-cta:hover {
+  transform: translateY(-2px);
+  border-color: rgba(240, 175, 94, 0.55);
+  background: rgba(240, 175, 94, 0.14);
+}
+
+.landing-cta.primary {
+  color: var(--topbar-active-text);
+  background: var(--topbar-active-bg);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.landing-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.landing-card {
+  transition: transform 200ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(240, 175, 94, 0.4);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.15);
+}
+
+.landing-inline-link {
+  color: var(--warn);
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.landing-inline-link:hover {
+  text-decoration: underline;
+}
+
 .topbar {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -236,6 +319,20 @@ html.theme-animating .theme-toggle::after {
   background: rgba(240, 175, 94, 0.12);
 }
 
+.topbar-link:focus-visible,
+.theme-toggle:focus-visible,
+.landing-cta:focus-visible,
+.landing-inline-link:focus-visible,
+.search-input:focus-visible,
+.search-submit:focus-visible,
+.search-clear:focus-visible,
+.grafana-expand-btn:focus-visible,
+.grafana-modal-close:focus-visible,
+.grafana-modal-open:focus-visible {
+  outline: 2px solid rgba(240, 175, 94, 0.8);
+  outline-offset: 2px;
+}
+
 .topbar-link.is-active {
   color: var(--topbar-active-text);
   font-weight: 700;
@@ -314,6 +411,11 @@ h1 {
   align-items: center;
 }
 
+.search-actions {
+  display: inline-flex;
+  gap: 0.45rem;
+}
+
 .search-input {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -341,6 +443,30 @@ h1 {
   font-size: 0.82rem;
   cursor: pointer;
   transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.search-submit {
+  border: 1px solid rgba(84, 208, 141, 0.45);
+  border-radius: 10px;
+  background: linear-gradient(130deg, rgba(84, 208, 141, 0.24), rgba(84, 208, 141, 0.1));
+  color: #d2ffe8;
+  padding: 0.58rem 0.78rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.search-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(84, 208, 141, 0.72);
+  background: linear-gradient(130deg, rgba(84, 208, 141, 0.35), rgba(84, 208, 141, 0.15));
+}
+
+.search-submit:disabled,
+.search-clear:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .search-clear:hover {
@@ -407,6 +533,12 @@ h1 {
   border-radius: 16px;
   background: var(--surface);
   padding: 1rem;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.kpi-card:hover {
+  border-color: rgba(240, 175, 94, 0.35);
+  transform: translateY(-1px);
 }
 .kpi-label { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .kpi-value {
@@ -425,10 +557,41 @@ h1 {
   border-radius: 16px;
   background: var(--surface);
   padding: 1rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.panel:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.08);
 }
 .panel h2, .panel h3 { margin: 0 0 0.8rem; }
 .panel p { margin: 0.4rem 0; color: var(--muted); }
 .panel-head { display: flex; justify-content: space-between; align-items: center; }
+.panel-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.grafana-expand-btn {
+  border: 1px solid rgba(240, 175, 94, 0.38);
+  border-radius: 9px;
+  background: linear-gradient(130deg, rgba(240, 175, 94, 0.22), rgba(240, 175, 94, 0.06));
+  color: #ffd59b;
+  padding: 0.36rem 0.62rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.grafana-expand-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(240, 175, 94, 0.62);
+  background: linear-gradient(130deg, rgba(240, 175, 94, 0.34), rgba(240, 175, 94, 0.12));
+}
+
 .chart-wrap { width: 100%; min-height: 220px; }
 
 .strategic-note {
@@ -446,6 +609,13 @@ h1 {
   border-radius: 16px;
   background: var(--surface);
   padding: 0.9rem;
+  transition: border-color 200ms ease, box-shadow 220ms ease, transform 180ms ease;
+}
+
+.grafana-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(240, 175, 94, 0.48);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
 }
 
 .grafana-note {
@@ -464,6 +634,99 @@ h1 {
 .grafana-frame {
   width: 100%;
   min-height: 280px;
+  border: 0;
+  display: block;
+}
+
+.grafana-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  padding: clamp(0.75rem, 2.2vw, 1.6rem);
+  display: grid;
+  place-items: center;
+  background: rgba(5, 10, 12, 0.72);
+  backdrop-filter: blur(4px);
+  animation: modal-fade-in 180ms ease;
+}
+
+.grafana-modal {
+  width: min(1200px, 96vw);
+  max-height: 92vh;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(155deg, rgba(10, 17, 24, 0.96), rgba(10, 17, 24, 0.84));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.48);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+  animation: modal-slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grafana-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.grafana-modal-head h3 {
+  margin: 0;
+}
+
+.grafana-modal-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.grafana-modal-open,
+.grafana-modal-close {
+  border-radius: 9px;
+  padding: 0.4rem 0.68rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.grafana-modal-open {
+  text-decoration: none;
+  color: #d2ffe8;
+  border: 1px solid rgba(84, 208, 141, 0.45);
+  background: linear-gradient(130deg, rgba(84, 208, 141, 0.26), rgba(84, 208, 141, 0.1));
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.grafana-modal-open:hover {
+  transform: translateY(-1px);
+  border-color: rgba(84, 208, 141, 0.74);
+  background: linear-gradient(130deg, rgba(84, 208, 141, 0.36), rgba(84, 208, 141, 0.15));
+}
+
+.grafana-modal-close {
+  color: var(--topbar-link);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: transparent;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.grafana-modal-close:hover {
+  transform: translateY(-1px);
+  border-color: rgba(240, 175, 94, 0.48);
+  background: rgba(240, 175, 94, 0.13);
+}
+
+.grafana-modal-frame-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(7, 19, 25, 0.5);
+  min-height: min(68vh, 760px);
+}
+
+.grafana-modal-frame {
+  width: 100%;
+  height: min(68vh, 760px);
   border: 0;
   display: block;
 }
@@ -502,6 +765,22 @@ h1 {
   100% { box-shadow: 0 0 0 0 rgba(84, 208, 141, 0); }
 }
 
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (max-width: 900px) {
   .topbar { grid-template-columns: 1fr; top: 0.5rem; }
   .topbar-brand-wrap { justify-items: center; text-align: center; }
@@ -510,9 +789,36 @@ h1 {
   .topbar-link { white-space: nowrap; }
   .top-hero { grid-template-columns: 1fr; }
   .search-input-wrap { grid-template-columns: 1fr; }
+  .search-actions { width: 100%; }
+  .search-submit, .search-clear { flex: 1; }
   .search-head { flex-direction: column; align-items: flex-start; }
+  .landing-wrap { align-content: start; }
+  .landing-hero { text-align: left; justify-items: start; }
+  .landing-cta-row { justify-content: flex-start; }
   .grafana-grid { grid-template-columns: 1fr; }
   .grafana-frame { min-height: 240px; }
+  .grafana-modal {
+    width: 100%;
+    max-height: 94vh;
+    padding: 0.72rem;
+  }
+  .grafana-modal-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .grafana-modal-actions {
+    width: 100%;
+  }
+  .grafana-modal-open,
+  .grafana-modal-close {
+    flex: 1;
+    text-align: center;
+  }
+  .grafana-modal-frame-wrap,
+  .grafana-modal-frame {
+    min-height: 62vh;
+    height: 62vh;
+  }
 }
 
 :root[data-theme="light"] {
@@ -552,6 +858,22 @@ h1 {
 }
 :root[data-theme="light"] .theme-icon-moon {
   color: #6b88a7;
+}
+:root[data-theme="light"] .grafana-expand-btn {
+  color: #7a4912;
+  border-color: rgba(166, 113, 48, 0.42);
+  background: linear-gradient(130deg, rgba(233, 185, 104, 0.34), rgba(255, 255, 255, 0.62));
+}
+:root[data-theme="light"] .grafana-modal-overlay {
+  background: rgba(25, 31, 29, 0.45);
+}
+:root[data-theme="light"] .grafana-modal {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98), rgba(251, 247, 238, 0.96));
+  box-shadow: 0 20px 55px rgba(59, 45, 25, 0.25);
+}
+:root[data-theme="light"] .grafana-modal-frame-wrap {
+  border-color: rgba(34, 45, 47, 0.18);
+  background: rgba(255, 255, 255, 0.74);
 }
 
 @media (prefers-color-scheme: light) {
