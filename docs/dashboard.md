@@ -61,6 +61,29 @@ Pytest (:9092) ──scrape──▶       │                      (painéis, f
 
 ## Como Executar
 
+### Dashboards Grafana (Executivo e Tecnico)
+
+O fluxo oficial do projeto passa a ser **Grafana-first**, com 3 dashboards separados (equivalentes a abas de decisão):
+
+- `ASIS TaxTech - Dashboard de Negocio`
+- `ASIS TaxTech - Dashboard de Saude do Sistema`
+- `ASIS TaxTech - Dashboard de Testes Restantes`
+
+Arquivos provisionados:
+
+- `grafana/dashboards/asis-business-dashboard.json`
+- `grafana/dashboards/asis-system-health-dashboard.json`
+- `grafana/dashboards/asis-testing-gap-dashboard.json`
+
+Cada dashboard possui no minimo 8 paineis com foco em tomada de decisao, incluindo KPIs, tendencias, breakdown por causa, pressao operacional e risco.
+
+Endpoints backend de agregacao permanecem disponiveis para evolucoes e consumo externo:
+
+- `GET /api/v1/dashboard/business`
+- `GET /api/v1/dashboard/system-health`
+- `GET /api/v1/dashboard/testing-gap`
+- `GET /api/v1/dashboard/metadata`
+
 ### Pré-requisitos
 - Docker e Docker Compose instalados
 - `.venv` criado e dependências instaladas (`pip install -r requirements.txt`)

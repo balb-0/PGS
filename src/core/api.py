@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path, Depends, Request
+from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path, Depends, Request, Query
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Dict, Any, List, Optional
 import uuid
@@ -6,6 +6,14 @@ import time
 import re
 
 from . import metrics as prom_metrics
+from .dashboard_services import (
+    DashboardDependencies,
+    DashboardFilters,
+    BusinessDashboardService,
+    SystemHealthDashboardService,
+    TestingGapDashboardService,
+    build_dashboard_metadata,
+)
 import asyncio
 import random
 import os
@@ -1147,7 +1155,45 @@ transaction_history = TransactionHistoryStore()
 # Instância global do analisador de sazonalidade (stateless, usa métodos estáticos)
 seasonality_analyzer = SeasonalityAnalyzer()
 
+dashboard_dependencies = DashboardDependencies(
+    health_checker=health_checker,
+    circuit_breaker=circuit_breaker,
+    rate_limiter=rate_limiter,
+    process_store=process_store,
+    audit_log=audit_log,
+    idempotency_store=idempotency_store,
+    transaction_history=transaction_history,
+)
+business_dashboard_service = BusinessDashboardService(dashboard_dependencies)
+system_health_dashboard_service = SystemHealthDashboardService(dashboard_dependencies)
+testing_gap_dashboard_service = TestingGapDashboardService(dashboard_dependencies)
+
 app = FastAPI(title="API_G6 - ASIS TaxTech (Unified Proxy & Mock Fallback)", version="2.0.0")
+
+
+def parse_dashboard_filters(
+    interval: str = Query(default="1h"),
+    step: str = Query(default="5m"),
+    endpoint: str = Query(default="all"),
+    source: str = Query(default="all"),
+    account: str = Query(default="all"),
+    dn: str = Query(default="all"),
+) -> DashboardFilters:
+    if not re.match(r"^\d+[mhd]$", interval):
+        raise HTTPException(status_code=400, detail="Filtro 'interval' inválido. Use formatos como 30m, 1h, 7d.")
+    if not re.match(r"^\d+[smhd]$", step):
+        raise HTTPException(status_code=400, detail="Filtro 'step' inválido. Use formatos como 30s, 1m, 5m.")
+    if source not in {"all", "real", "mock"}:
+        raise HTTPException(status_code=400, detail="Filtro 'source' inválido. Use all, real ou mock.")
+
+    return DashboardFilters(
+        interval=interval,
+        step=step,
+        endpoint=endpoint,
+        source=source,
+        account=account,
+        dn=dn,
+    )
 
 
 # =============================================================================
@@ -1559,6 +1605,41 @@ async def prometheus_metrics():
         content=prom_metrics.get_metrics_output(),
         media_type=prom_metrics.get_content_type(),
     )
+
+
+@app.get("/api/v1/dashboard/business", status_code=200)
+async def get_business_dashboard(
+    filters: DashboardFilters = Depends(parse_dashboard_filters),
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return business_dashboard_service.build(filters)
+
+
+@app.get("/api/v1/dashboard/system-health", status_code=200)
+async def get_system_health_dashboard(
+    filters: DashboardFilters = Depends(parse_dashboard_filters),
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return system_health_dashboard_service.build(filters)
+
+
+@app.get("/api/v1/dashboard/testing-gap", status_code=200)
+async def get_testing_gap_dashboard(
+    filters: DashboardFilters = Depends(parse_dashboard_filters),
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return testing_gap_dashboard_service.build(filters)
+
+
+@app.get("/api/v1/dashboard/metadata", status_code=200)
+async def get_dashboard_metadata(
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return build_dashboard_metadata()
 
 
 @app.post("/api/v1/auditar/resilient", status_code=201)
