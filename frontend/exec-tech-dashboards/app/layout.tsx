@@ -7,7 +7,7 @@ const body = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "700"], 
 
 export const metadata: Metadata = {
   title: "ASIS Strategic Dashboards",
-  description: "Dashboards de negócio, saúde do sistema e testes restantes.",
+  description: "Dashboards de negócio, saúde do sistema e busca inteligente com IA.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

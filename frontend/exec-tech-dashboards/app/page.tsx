@@ -8,7 +8,7 @@ export default function HomePage() {
           <p className="eyebrow">ASIS Intelligence Center</p>
           <h1>Dashboards para decisão</h1>
           <p className="subtitle">
-            Três visões separadas para negócio, saúde técnica e lacunas de testes.
+            Três visões separadas para negócio, saúde técnica e busca inteligente de gráficos.
           </p>
         </div>
       </section>
@@ -20,7 +20,7 @@ export default function HomePage() {
           <div className="topbar-nav">
             <Link href="/business" className="topbar-link">Dashboard de Negócio</Link>
             <Link href="/system-health" className="topbar-link">Dashboard de Saúde do Sistema</Link>
-            <Link href="/testing-gap" className="nav-pill">Dashboard de Testes Restantes</Link>
+            <Link href="/ai-search" className="topbar-link">Busca Inteligente com IA</Link>
           </div>
         </article>
       </section>

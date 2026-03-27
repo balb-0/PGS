@@ -14,7 +14,7 @@ type Props = {
 const nav: Array<{ href: Route; label: string }> = [
   { href: "/business", label: "Negócio" },
   { href: "/system-health", label: "Saúde" },
-  { href: "/testing-gap", label: "Testes Restantes" },
+  { href: "/ai-search", label: "Busca IA" },
 ];
 
 const THEME_STORAGE_KEY = "asis-theme";
@@ -104,7 +104,7 @@ export function DashboardShell({ title, subtitle, children }: Props) {
           <h1>{title}</h1>
           <p className="subtitle">{subtitle}</p>
         </div>
-        <p className="hero-context">Navegue entre Negócio, Saúde e Testes Restantes pela barra superior.</p>
+        <p className="hero-context">Navegue entre Negócio, Saúde e Busca IA pela barra superior.</p>
       </header>
       <section className="content-grid">{children}</section>
     </main>
