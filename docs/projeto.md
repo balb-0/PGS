@@ -118,6 +118,7 @@
     - [Decisão Arquitetural e Contexto de BD/DN](#decisão-arquitetural-e-contexto-de-bddn-4)
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-4)
 - [4. Integrações de Serviços (Sprint de Consolidação)](#4-integrações-de-serviços-sprint-de-consolidação)
+  - [4.1 INT1 — Análise Estática com SonarCloud](#41-int1--análise-estática-com-sonarcloud)
   - [4.2 - INT2: Locust](#42---int2-locust)
     - [Objetivo](#objetivo-int2)
     - [Cenários de Teste (CEN-1 a CEN-5)](#cenários-de-teste-cen-1-a-cen-5)
@@ -140,19 +141,21 @@
     - [Impacto na Qualidade — Aspectos Positivos e Negativos Mapeados](#impacto-na-qualidade--aspectos-positivos-e-negativos-mapeados-5)
   - [4.4 INT4 — Sincronismo de versões via API do GitLab](#44-int4--sincronismo-de-versões-via-api-do-gitlab)
     - [4.4.1 Assinatura / critério de versão](#441-assinatura--critério-de-versão)
+    - [4.4.2 Objetivo da integração](#442-objetivo-da-integração)
+    - [4.4.3 Requisitos e DNs relacionados](#443-requisitos-e-dns-relacionados)
+    - [4.4.4 Como se conectar ao serviço](#444-como-se-conectar-ao-serviço)
+    - [4.4.5 Função de verificação do protocolo](#445-função-de-verificação-do-protocolo)
+    - [4.4.6 Testes](#446-testes)
+  - [4.5 INT5 (Blue Team) — Aferição de Layout SPED/RFB](#45-int5-blue-team--aferição-de-layout-spedrfb)
 - [5. Direcionadores Adversariais — Red Team (Sprint de Consolidação)](#5-direcionadores-adversariais--red-team-sprint-de-consolidação)
   - [5.1 INT3 (Red Team) — Autenticação Híbrida Clerk sob Perspectiva Adversarial](#51-int3-red-team--autenticação-híbrida-clerk-sob-perspectiva-adversarial)
   - [5.2 RNF1 (Red Team) — Disputa de Não-Repúdio sob Perspectiva Adversarial](#52-rnf1-red-team--disputa-de-não-repúdio-sob-perspectiva-adversarial)
   - [5.3 RNF2 (Red Team) — Autenticidade sob Perspectiva Adversarial](#53-rnf2-red-team--autenticidade-sob-perspectiva-adversarial)
   - [5.4 INT4 (Red Team) — Sincronismo GitLab sob Perspectiva Adversarial](#54-int4-red-team--sincronismo-gitlab-sob-perspectiva-adversarial)
   - [5.5 INT5 (Red Team) — Aferição SPED/RFB sob Perspectiva Adversarial](#55-int5-red-team--aferição-spedrfb-sob-perspectiva-adversarial)
-    - [4.4.2 Objetivo da integração](#442-objetivo-da-integração)
-    - [4.4.3 Requisitos e DNs relacionados](#443-requisitos-e-dns-relacionados)
-    - [4.4.4 Como se conectar ao serviço](#444-como-se-conectar-ao-serviço)
-    - [4.4.5 Função de verificação do protocolo](#445-função-de-verificação-do-protocolo)
-    - [4.4.6 Testes](#446-testes)
 - [6. Dashboard e Observabilidade](#6-dashboard-e-observabilidade)
   - [6.1 Prometheus](#61-prometheus)
+  - [6.2 Grafana e Dashboards Executivos](#62-grafana-e-dashboards-executivos)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -1621,8 +1624,6 @@ pytest --cov=src/core --cov-report=html --cov-branch --html=report.html --self-c
 
 ### Definição do Requisito
 
-### Definição do Requisito
-
 **RNF1:** _Testar o alerta não-repúdio a partir de uma reclamação de cliente por transação alegada como não efetuada no dia anterior. Verificar se a transação está dentro da sazonalidade de valor, recorrência e data._
 
 &emsp;Este requisito não funcional endereça um cenário crítico de negócio para a ASIS TaxTech: quando um cliente contesta uma transação de auditoria fiscal alegando que não a realizou, o sistema deve ser capaz de **analisar automaticamente** se a transação contestada está dentro dos **padrões históricos do cliente** em três dimensões:
@@ -1888,6 +1889,60 @@ pytest src/tests/blue_team/RNF1_non_repudiation_dispute_blue.py::TestRNF1Contrat
 | **INT3** | Clerk       | Externa  | OpenID Connect / OAuth 2.0             | Garantir isolamento de contas (DN4) e conformidade LGPD.      |
 | **INT4** | GitLab API  | Externa  | REST API v4 (Commit/Tag Sync)          | Verificar se a versão em Produção é a mesma homologada.       |
 | **INT5** | RFB / SPED  | Externa  | Layout Fiscal Web Service (v2026)      | Garantir que o upload (RF1) segue as normas vigentes da Receita. |
+
+---
+
+## 4.1 INT1 — Análise Estática com SonarCloud
+
+### Objetivo
+
+&emsp;A INT1 integra o **SonarCloud** à esteira de CI/CD do GitLab para fornecer análise estática contínua do código-fonte. A cada push ou merge request, o pipeline executa o scanner que avalia qualidade, segurança, duplicação e cobertura do código em `src/core/`, alimentando um Quality Gate que pode bloquear merges com brechas de segurança.
+
+### Assinatura / Critério de Versão
+
+| Item | Valor |
+|------|-------|
+| **Serviço** | [SonarCloud](https://sonarcloud.io/) |
+| **Scanner** | `sonarsource/sonar-scanner-cli:latest` |
+| **Project Key** | `arthur-sonar_sonar-g06` |
+| **Organization** | `arthur-sonar` |
+| **Configuração** | `sonar-project.properties` |
+
+### Integração com CI/CD
+
+&emsp;O pipeline GitLab (`.gitlab-ci.yml`) define dois estágios sequenciais:
+
+1. **test**: executa `pytest` com cobertura (`--cov=src/core --cov-report=xml:coverage.xml`) e relatório JUnit (`pytest-report.xml`).
+2. **quality**: o job `sonarcloud` consome os artefatos do estágio anterior e executa o scanner, enviando o relatório de cobertura (`coverage.xml`) para o SonarCloud.
+
+```yaml
+sonarcloud:
+  stage: quality
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+  needs:
+    - job: pytest
+      artifacts: true
+  script:
+    - sonar-scanner -Dsonar.host.url="${SONAR_HOST_URL}" -Dsonar.token="$SONAR_TOKEN"
+```
+
+### Escopo da Análise
+
+| Parâmetro | Valor |
+|-----------|-------|
+| **Fontes analisadas** | `src/core` |
+| **Testes reconhecidos** | `src/tests/**/*.py` |
+| **Cobertura** | `coverage.xml` (gerado pelo pytest) |
+| **Exclusões** | `docs/**`, `**/*.md`, `**/*.png`, `**/*.jpg`, `**/*.txt` |
+
+### Relação com Business Drivers
+
+| Driver | Como a INT1 contribui |
+|--------|----------------------|
+| **DN2 (Integridade)** | Detecta code smells e bugs que poderiam comprometer validações de dados |
+| **RNF3 (Testabilidade)** | Monitora cobertura de testes e complexidade ciclomática |
+| **TAP (Qualidade/Arquitetura/Segurança)** | Fornece relatórios de qualidade, vulnerabilidades e duplicação como ativo de software |
 
 ---
 
@@ -2581,6 +2636,70 @@ Os testes validam: estrutura do retorno de `verificar_protocolo_gitlab()`, obten
 
 ---
 
+## 4.5 INT5 (Blue Team) — Aferição de Layout SPED/RFB
+
+### Objetivo
+
+&emsp;A INT5 implementa um motor de **aferição de conformidade de layout** que valida se os payloads gerados pelo sistema ASIS e destinados ao SPED estão em rigorosa conformidade com o **Layout Oficial (v2026)** da Receita Federal. A validação é autocontida — não depende de chamadas de rede externas ou da disponibilidade da infraestrutura da RFB.
+
+### Assinatura / Critério de Versão
+
+| Item | Valor |
+|------|-------|
+| **Serviço** | RFB / SPED (Layout Fiscal) |
+| **Versão do Layout** | `v2026` |
+| **Tipo de integração** | Externa (simulada localmente) |
+| **Módulo** | `src/tests/blue_team/test_int5_sped_afericao.py` |
+
+### Regras de Validação do Layout
+
+O motor valida o payload contra a definição `LAYOUT_RF1_V2026`:
+
+| Campo | Tipo | Obrigatório | Regra Adicional |
+|-------|------|:-----------:|-----------------|
+| `versao` | `str` | Sim | Valor exato: `"v2026"` |
+| `cnpj_emissor` | `str` | Sim | Exatamente 14 caracteres |
+| `competencia` | `str` | Sim | — |
+| `hash_lote` | `str` | Sim | — |
+| `volume_transacoes` | `int` | Não | — |
+
+### Metodologia de Testagem (Blue Team)
+
+&emsp;A suíte em `src/tests/blue_team/test_int5_sped_afericao.py` utiliza `TestClient` para enviar requisições à API ASIS, intercepta o campo `payload_sped_gerado` da resposta e valida esse contrato contra o layout oficial.
+
+**Estrutura dos testes (3 cenários):**
+
+| Cenário | Classe | Descrição |
+|---------|--------|-----------|
+| **INT5.B1** | `TestINT5SpedAfericaoLayoutIntegrado` | Payload ASIS válido gera contrato CONFORME ao layout v2026 |
+| **INT5.B2** | `TestINT5SpedAfericaoLayoutIntegrado` | Simulação de campo novo exigido pela Receita detecta QUEBRA DE CONTRATO |
+| **INT5.B3** | `TestINT5SpedAfericaoLayoutIntegrado` | Estrutura do relatório de aferição contém campos obrigatórios (`integracao`, `timestamp`, `versao_layout`, `status`) |
+
+### Resultados Obtidos
+
+&emsp;Todos os 3 cenários **PASS**. O motor de aferição:
+
+- Confirma conformidade quando o payload ASIS segue o layout v2026
+- Detecta e reporta quebras de contrato quando o layout evolui (campo novo obrigatório)
+- Gera relatórios estruturados com `integracao`, `timestamp`, `versao_layout` e `status`
+
+### Execução dos Testes
+
+```bash
+# Executar testes INT5 Blue Team
+pytest src/tests/blue_team/test_int5_sped_afericao.py -v -s
+```
+
+### Relação com Business Drivers
+
+| Driver | Como a INT5 contribui |
+|--------|----------------------|
+| **RF1 (Processamento Assíncrono)** | Garante que o payload gerado pelo endpoint de auditoria segue o layout fiscal exigido |
+| **DN2 (Integridade)** | Valida a correção estrutural do contrato SPED antes de eventual envio à RFB |
+| **TAP (Replicabilidade)** | Motor de validação desacoplado que pode ser reutilizado para outros layouts fiscais |
+
+---
+
 # 5. Direcionadores Adversariais — Red Team (Sprint de Consolidação)
 
 &emsp;Esta seção documenta os testes adversariais (Red Team) implementados para os componentes que anteriormente possuíam apenas cobertura Blue Team. O Red Team simula cenários de ataque para expor vulnerabilidades, limites e lacunas que os testes de aceite convencionais não exercitam.
@@ -2997,3 +3116,60 @@ O **Alertmanager** recebe alertas disparados pelo Prometheus, agrupa, deduplica 
 - `repeat_interval`: 5m — intervalo para reenviar alertas ainda ativos
 
 **Receivers:** Os receivers `default`, `critical` e `warning` estão definidos sem canais de notificação (webhook, Slack, email). Para ativar envio, adicione em `alertmanager.yml` exemplos como `webhook_configs`, `slack_configs` ou `email_configs` em cada receiver.
+
+---
+
+### 6.2 Grafana e Dashboards Executivos
+
+&emsp;O Grafana é provisionado automaticamente via Docker Compose com datasource Prometheus e 4 dashboards pré-carregados. A camada de visualização é complementada por um frontend Next.js que organiza leituras orientadas à decisão.
+
+#### Dashboards Provisionados
+
+| Dashboard | UID | JSON | Foco |
+|-----------|-----|------|------|
+| **Dashboard da Qualidade** | `asis-quality-dashboard` | `grafana/dashboards/asis-quality-dashboard.json` | 25 painéis técnicos: DN1-DN4, RF1/RF2, Massa de Testes, Alertas |
+| **Dashboard de Negócio** | `asis-business-dashboard` | `grafana/dashboards/asis-business-dashboard.json` | Leitura executiva: SLA, throughput, sucesso, impacto operacional |
+| **Dashboard de Saúde** | `asis-system-health-dashboard` | `grafana/dashboards/asis-system-health-dashboard.json` | Saúde operacional: error rate, circuit breaker, rate limit, alertas |
+| **Dashboard de Testes** | `asis-testing-gap-dashboard` | `grafana/dashboards/asis-testing-gap-dashboard.json` | Cobertura e gaps de teste |
+
+#### Frontend Executivo (Next.js)
+
+&emsp;A aplicação em `dashboard/frontend/` serve como camada de apresentação para três contextos complementares:
+
+| Rota | Público-alvo | Função |
+|------|-------------|--------|
+| `/business` | Liderança, gestores | Traduz sinais técnicos em leitura de impacto operacional |
+| `/system-health` | Engenharia, SRE, operação | Triagem rápida de incidentes e degradações |
+| `/ai-search` | Qualquer usuário | Busca inteligente de painéis por linguagem natural (OpenAI + fallback local) |
+
+#### Endpoints Backend de Dashboard
+
+| Endpoint | Descrição |
+|----------|-----------|
+| `GET /api/v1/dashboard/business` | Dados agregados de negócio (summary, trends, degradation) |
+| `GET /api/v1/dashboard/system-health` | Dados de saúde do sistema (health_score, error_rate, circuit_breaker) |
+| `GET /api/v1/dashboard/testing-gap` | Dados de cobertura de testes |
+| `GET /api/v1/dashboard/metadata` | Metadados e filtros disponíveis |
+
+#### Testes Blue Team dos Dashboards
+
+&emsp;A suíte em `src/tests/blue_team/dashboards_blue.py` valida o contrato dos endpoints de dashboard:
+
+- `test_dashboard_business_retorna_contrato_basico`: verifica status 200, campos `summary` e `trends`
+- `test_dashboard_system_health_retorna_contrato_basico`: verifica status 200, campos `summary` e `breakdown`
+- `test_dashboard_testing_gap_retorna_contrato_basico`: verifica status 200, campos `summary` e `coverage`
+- `test_dashboard_metadata_retorna_filtros`: verifica status 200, campos `dashboards` e `filters`
+- `test_dashboard_rejeita_interval_invalido`: verifica rejeição de parâmetros inválidos
+
+```bash
+pytest src/tests/blue_team/dashboards_blue.py -v
+```
+
+#### Documentação Complementar
+
+Para detalhes técnicos sobre a stack de observabilidade, painéis PromQL, Truth Definitions e configuração:
+
+- **[dashboard.md](./dashboard.md)**: documentação completa do Dashboard da Qualidade (métricas, painéis, variáveis template, regras de alerta)
+- **[execucao-dashboard.md](./execucao-dashboard.md)**: guia unificado de execução da stack completa (API, Docker, Grafana, frontend)
+- **[plano_integracao_prometheus.md](./plano_integracao_prometheus.md)**: plano técnico de integração Prometheus
+- **[catalogo_servicos_monitorados.md](./catalogo_servicos_monitorados.md)**: catálogo de endpoints e mapeamento para DN/RF/RNF
