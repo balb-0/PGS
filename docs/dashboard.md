@@ -751,6 +751,44 @@ Cada definição mapeia um aspecto do dashboard ao código-fonte, garantindo ras
 
 ### 9.1 Pré-requisitos
 
+## Painéis do Dashboard
+
+| Seção | Painéis | Métricas Utilizadas |
+|-------|---------|---------------------|
+| **DN1 — Latência** | Gauge P90, Gauge P95, Taxa de req/s, Latência P50/P90/P99, Requisições por status/fonte | `asis_request_duration_seconds`, `asis_requests_total` |
+| **DN2 — Integridade** | Erros por tipo (timeseries), Erros por campo (tabela) | `asis_validation_errors_total` |
+| **DN3 — Disponibilidade** | Gauge taxa de erro, Stat uptime, Stat circuit breaker, Rate limit restante, Taxa de erro timeline | `asis_health_error_rate_percent`, `asis_health_uptime_seconds`, `asis_circuit_breaker_state`, `asis_rate_limit_remaining` |
+| **DN4 — Não-Repúdio** | Stat entradas audit log, Stat tamanho log, Alertas NR por tipo, Crescimento log, Detecção violações | `asis_audit_log_entries_total`, `asis_audit_log_size`, `asis_nr_alerts_total` |
+| **RF1/RF2 — Registros** | ProcessStore/IdempotencyStore, Requisições concorrentes, Health requests vs errors | `asis_process_store_size`, `asis_idempotency_store_size`, `asis_concurrent_requests`, `asis_health_total_requests`, `asis_health_total_errors` |
+| **Massa de Testes** | Gauge pass rate %, Stat total, Stat passed, Stat failed | `pytest_tests_total`, `pytest_tests_passed` |
+| **Alertas** | Tabela de alertas firing | `ALERTS{alertstate="firing"}` |
+
+## Como Executar
+
+### Dashboards Grafana (Executivo e Tecnico)
+
+O fluxo oficial do projeto passa a ser **Grafana-first**, com 3 dashboards separados (equivalentes a abas de decisão):
+
+- `ASIS TaxTech - Dashboard de Negocio`
+- `ASIS TaxTech - Dashboard de Saude do Sistema`
+- `ASIS TaxTech - Dashboard de Testes Restantes`
+
+Arquivos provisionados:
+
+- `grafana/dashboards/asis-business-dashboard.json`
+- `grafana/dashboards/asis-system-health-dashboard.json`
+- `grafana/dashboards/asis-testing-gap-dashboard.json`
+
+Cada dashboard possui no minimo 8 paineis com foco em tomada de decisao, incluindo KPIs, tendencias, breakdown por causa, pressao operacional e risco.
+
+Endpoints backend de agregacao permanecem disponiveis para evolucoes e consumo externo:
+
+- `GET /api/v1/dashboard/business`
+- `GET /api/v1/dashboard/system-health`
+- `GET /api/v1/dashboard/testing-gap`
+- `GET /api/v1/dashboard/metadata`
+
+### Pré-requisitos
 - Docker e Docker Compose instalados
 - `.venv` criado e dependências instaladas (`pip install -r requirements.txt`)
 - Arquivo `.env` presente na raiz (ver seção 9.4)
