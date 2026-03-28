@@ -2596,13 +2596,13 @@ Na raiz do repositório:
 
 ```bash
 # Saída legível (status + commits)
-python src/scripts/verifica_versao_gitlab.py
+python scripts/verifica_versao_gitlab.py
 
 # Saída em JSON (para cron/automação)
-python src/scripts/verifica_versao_gitlab.py --json
+python scripts/verifica_versao_gitlab.py --json
 
 # Apenas verificação do protocolo da API (não compara commits)
-python src/scripts/verifica_versao_gitlab.py --apenas-protocolo
+python scripts/verifica_versao_gitlab.py --apenas-protocolo
 ```
 
 **Exit code:** `0` quando produção e homologação estão na mesma versão; `1` quando estão diferentes ou há erro.
@@ -2612,12 +2612,12 @@ python src/scripts/verifica_versao_gitlab.py --apenas-protocolo
 Exemplo para rodar a cada hora e registrar o resultado:
 
 ```bash
-0 * * * * cd /caminho/para/repo && python src/scripts/verifica_versao_gitlab.py --json >> /var/log/gitlab_sync.log 2>&1
+0 * * * * cd /caminho/para/repo && python scripts/verifica_versao_gitlab.py --json >> /var/log/gitlab_sync.log 2>&1
 ```
 
 ### 4.4.5 Função de verificação do protocolo
 
-A função **`verificar_protocolo_gitlab()`** (em `src/scripts/verifica_versao_gitlab.py`):
+A função **`verificar_protocolo_gitlab()`** (em `scripts/verifica_versao_gitlab.py`):
 
 1. Chama `GET /projects/:id` para validar acesso ao projeto e que a API está respondendo.
 2. Chama `GET /projects/:id/repository/commits?ref_name=main&per_page=1` e valida que a resposta é uma lista de commits com campos `id` e `title`.
