@@ -1,12 +1,7 @@
-import sys
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from core.api import app, process_store, MODULOS_FISCAIS_VALIDOS  # type: ignore
+from src.core.api import app, process_store, MODULOS_FISCAIS_VALIDOS  # type: ignore
 
 
 client = TestClient(app)
@@ -29,7 +24,7 @@ PAYLOAD_VALIDO = {
 def limpar_store_processos():
     # Limpa o store de processos entre os testes para isolar estado.
     # A API nao expõe um clear, entao resetamos o objeto global diretamente.
-    from core.api import ProcessStore  # type: ignore
+    from src.core.api import ProcessStore  # type: ignore
 
     global process_store  # type: ignore
     process_store = ProcessStore()

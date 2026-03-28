@@ -1,6 +1,8 @@
 # --- SEGURANÇA E CONGRUÊNCIA ASIS ---
 .env
 *.env
+.env.*
+!.env.example
 config.json
 secrets.py
 credentials/
@@ -22,6 +24,16 @@ pip-delete-this-directory.txt
 reports/*.html
 reports/*.json
 *.log
+debug-*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.pid
+*.seed
+*.stackdump
+
+# --- OBSERVABILIDADE (Prometheus, etc.) ---
+prometheus_data/
 .pytest_cache/
 .coverage
 htmlcov/
@@ -30,11 +42,24 @@ pytest-report.xml
 .sonar/
 .scannerwork/
 
+# --- NODE / NEXT.JS ---
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+coverage/
+.pnpm-store/
+*.tsbuildinfo
+
 # --- SISTEMA OPERACIONAL E EDITORES ---
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.swp
+*.swo
+.cache/
+.sass-cache/
 
 ESMD9_ASIS_TAP_2025.md

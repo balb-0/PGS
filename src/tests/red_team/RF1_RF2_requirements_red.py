@@ -19,8 +19,6 @@ from dotenv import load_dotenv
 _load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
 load_dotenv(_load_env_path)
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
 if BASE_URL:
     # Cliente HTTP contra a API real (servidor ja em execucao)
@@ -43,7 +41,7 @@ if BASE_URL:
     client = _RealAPIClient()
 else:
     from fastapi.testclient import TestClient
-    from core.api import app
+    from src.core.api import app
 
     client = TestClient(app)
 

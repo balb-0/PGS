@@ -29,10 +29,8 @@ from fastapi.testclient import TestClient
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from core.api import app
-from core.api import (
+from src.core.api import app
+from src.core.api import (
     SeasonalityAnalyzer,
     TransactionHistoryStore,
     check_dispute_alert,
@@ -82,7 +80,7 @@ ITERACOES = [1, 2, 3]
 @pytest.fixture(autouse=True)
 def setup_teardown():
     """Isola estado global antes de cada cenário de teste."""
-    from core.api import clear_replay_cache
+    from src.core.api import clear_replay_cache
     audit_log.clear()
     transaction_history.clear()
     clear_replay_cache()

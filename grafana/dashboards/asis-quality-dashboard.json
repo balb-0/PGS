@@ -1,0 +1,625 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "enable": true,
+        "expr": "ALERTS{alertstate=\"firing\"}",
+        "iconColor": "red",
+        "name": "Alerts",
+        "titleFormat": "{{ alertname }}"
+      }
+    ]
+  },
+  "description": "Dashboard da Qualidade como Ativo de Software — ASIS TaxTech. Cobertura DN1-DN4, RF1-RF2, RNF1-RNF2, INT3-INT5.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "DN1 — Latência de Ingestão (SLA P90 ≤ 500ms)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "orange", "value": 0.5 },
+              { "color": "red", "value": 0.65 }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "Latência P90 (SLA: 500ms / Alerta: 650ms)",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.9, sum(rate(asis_request_duration_seconds_bucket{endpoint=~\"$endpoint\"}[$interval])) by (le))",
+          "legendFormat": "P90"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "title": "Latência P95",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(asis_request_duration_seconds_bucket{endpoint=~\"$endpoint\"}[$interval])) by (le))",
+          "legendFormat": "P95"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 1 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
+      "title": "Taxa de Requisições por Endpoint (req/s)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(asis_requests_total{endpoint=~\"$endpoint\", method=~\"$method\", status=~\"$status\", source=~\"$source\"}[$interval])) by (endpoint)",
+          "legendFormat": "{{ endpoint }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Latência ao Longo do Tempo (P50 / P90 / P99)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(asis_request_duration_seconds_bucket{endpoint=~\"$endpoint\"}[$interval])) by (le))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.9, sum(rate(asis_request_duration_seconds_bucket{endpoint=~\"$endpoint\"}[$interval])) by (le))",
+          "legendFormat": "P90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(asis_request_duration_seconds_bucket{endpoint=~\"$endpoint\"}[$interval])) by (le))",
+          "legendFormat": "P99"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Requisições por Status e Fonte (real/mock)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(increase(asis_requests_total{endpoint=~\"$endpoint\", method=~\"$method\", status=~\"$status\", source=~\"$source\"}[5m])) by (status, source)",
+          "legendFormat": "{{ status }} / {{ source }}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 101,
+      "title": "DN2 — Integridade dos Dados Fiscais",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Erros de Validação por Tipo",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(increase(asis_validation_errors_total[$interval])) by (validation_type)",
+          "legendFormat": "{{ validation_type }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "id": 7,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Erros" }] },
+      "title": "Erros de Validação por Campo",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "sum(increase(asis_validation_errors_total[$interval])) by (validation_type, field)",
+          "legendFormat": "{{ validation_type }} / {{ field }}",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "validation_type": "Tipo",
+              "field": "Campo",
+              "Value": "Erros"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "id": 102,
+      "title": "DN3 — Disponibilidade e Resiliência",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 15 },
+              { "color": "red", "value": 30 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 24 },
+      "id": 8,
+      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "title": "Taxa de Erro % (limiar 30%)",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "asis_health_error_rate_percent",
+          "legendFormat": "Error Rate"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 24 },
+      "id": 9,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Uptime (segundos)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "asis_health_uptime_seconds",
+          "legendFormat": "Uptime"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "green", "text": "CLOSED" }, "1": { "color": "red", "text": "OPEN" }, "2": { "color": "yellow", "text": "HALF_OPEN" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 24 },
+      "id": 10,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Circuit Breaker",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "asis_circuit_breaker_state{state=\"OPEN\"}",
+          "legendFormat": "OPEN"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 8, "x": 12, "y": 24 },
+      "id": 11,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Rate Limit Restante por Conta",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_rate_limit_remaining{account_key_hash=~\"$account\"}",
+          "legendFormat": "{{ account_key_hash }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 29 },
+      "id": 12,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Taxa de Erro ao Longo do Tempo",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_health_error_rate_percent",
+          "legendFormat": "Error Rate %"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "id": 103,
+      "title": "DN4 — Não-Repúdio e Auditoria",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } } },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 38 },
+      "id": 13,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Total de Entradas no Audit Log",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "asis_audit_log_entries_total",
+          "legendFormat": "Entradas"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 38 },
+      "id": 14,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Tamanho do Audit Log (registros)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "asis_audit_log_size",
+          "legendFormat": "Registros"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 38 },
+      "id": 15,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Alertas de Não-Repúdio por Tipo",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(increase(asis_nr_alerts_total[$interval])) by (alert_type)",
+          "legendFormat": "{{ alert_type }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 43 },
+      "id": 16,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Audit Log — Crescimento ao Longo do Tempo",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_audit_log_size",
+          "legendFormat": "Tamanho"
+        },
+        {
+          "expr": "asis_audit_log_entries_total",
+          "legendFormat": "Total Entradas"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 43 },
+      "id": 17,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Alertas NR — Detecção de Violações",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(asis_nr_alerts_total) by (alert_type)",
+          "legendFormat": "{{ alert_type }}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
+      "id": 104,
+      "title": "RF1 / RF2 — Processos e Registros",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 52 },
+      "id": 18,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "ProcessStore e IdempotencyStore",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_process_store_size",
+          "legendFormat": "ProcessStore"
+        },
+        {
+          "expr": "asis_idempotency_store_size",
+          "legendFormat": "IdempotencyStore"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 52 },
+      "id": 19,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Requisições Concorrentes (RNF1)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_concurrent_requests",
+          "legendFormat": "Concorrentes"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 52 },
+      "id": 20,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Health — Total de Requisições vs Erros",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "asis_health_total_requests",
+          "legendFormat": "Total Requests"
+        },
+        {
+          "expr": "asis_health_total_errors",
+          "legendFormat": "Total Errors"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
+      "id": 105,
+      "title": "Massa de Testes (Pytest)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 50 }, { "color": "green", "value": 80 }] },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 59 },
+      "id": 21,
+      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "title": "Taxa de Sucesso dos Testes %",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "(pytest_tests_passed / pytest_tests_total) * 100",
+          "legendFormat": "Pass Rate"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 59 },
+      "id": 22,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Total de Testes",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "pytest_tests_total",
+          "legendFormat": "Total"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 59 },
+      "id": 23,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        }
+      },
+      "title": "Testes Passando",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "pytest_tests_passed",
+          "legendFormat": "Passed"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 59 },
+      "id": 24,
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] },
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        }
+      },
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "title": "Testes Falhando",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "pytest_tests_total - pytest_tests_passed",
+          "legendFormat": "Failed"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 64 },
+      "id": 106,
+      "title": "Alertas Ativos",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 65 },
+      "id": 25,
+      "options": { "showHeader": true },
+      "title": "Alertas Prometheus Ativos",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "alertname": "Alerta",
+              "severity": "Severidade",
+              "dn": "DN",
+              "Value": "Estado"
+            },
+            "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true, "alertstate": true }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["asis", "qualidade", "prometheus", "dn1", "dn2", "dn3", "dn4"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_requests_total, endpoint)",
+        "includeAll": true,
+        "multi": true,
+        "name": "endpoint",
+        "query": "label_values(asis_requests_total, endpoint)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_requests_total, method)",
+        "includeAll": true,
+        "multi": true,
+        "name": "method",
+        "query": "label_values(asis_requests_total, method)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_requests_total, status)",
+        "includeAll": true,
+        "multi": true,
+        "name": "status",
+        "query": "label_values(asis_requests_total, status)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_requests_total, source)",
+        "includeAll": true,
+        "multi": true,
+        "name": "source",
+        "query": "label_values(asis_requests_total, source)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(asis_rate_limit_remaining, account_key_hash)",
+        "includeAll": true,
+        "multi": true,
+        "name": "account",
+        "query": "label_values(asis_rate_limit_remaining, account_key_hash)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": false, "text": "1m", "value": "1m" },
+        "name": "interval",
+        "options": [
+          { "selected": false, "text": "15s", "value": "15s" },
+          { "selected": false, "text": "30s", "value": "30s" },
+          { "selected": true, "text": "1m", "value": "1m" },
+          { "selected": false, "text": "5m", "value": "5m" },
+          { "selected": false, "text": "15m", "value": "15m" }
+        ],
+        "type": "custom"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ASIS TaxTech — Dashboard da Qualidade (LEGACY)",
+  "uid": "asis-quality-dashboard",
+  "version": 1
+}

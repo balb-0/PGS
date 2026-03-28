@@ -19,8 +19,6 @@ from dotenv import load_dotenv
 _load_env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
 load_dotenv(_load_env_path)
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 BASE_URL = os.environ.get("RED_TEAM_API_URL", "").rstrip("/")
 if BASE_URL:
     class _RealAPIClient:
@@ -40,10 +38,10 @@ if BASE_URL:
     client = _RealAPIClient()
 else:
     from fastapi.testclient import TestClient
-    from core.api import app
+    from src.core.api import app
     client = TestClient(app)
 
-from core.api import audit_log, verify_signature
+from src.core.api import audit_log, verify_signature
 
 HEADERS_VALIDOS = {
     "account-key": "red-team-account",
@@ -68,7 +66,7 @@ def limpar_log():
     if BASE_URL:
         yield
         return
-    from core.api import clear_replay_cache
+    from src.core.api import clear_replay_cache
     audit_log.clear()
     clear_replay_cache()
     yield

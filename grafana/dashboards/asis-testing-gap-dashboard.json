@@ -1,0 +1,283 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "enable": true,
+        "expr": "ALERTS{alertstate=\"firing\"}",
+        "iconColor": "red",
+        "name": "Alerts",
+        "titleFormat": "{{ alertname }}"
+      }
+    ]
+  },
+  "description": "Dashboard de testes restantes para priorizacao tecnica por risco e tendencia de qualidade.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Negocio",
+      "type": "dashboards",
+      "uid": "asis-business-dashboard"
+    },
+    {
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Saude do Sistema",
+      "type": "dashboards",
+      "uid": "asis-system-health-dashboard"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Qualidade de Testes e Risco Residual",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "Pass Rate",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "100 * (pytest_tests_passed / clamp_min(pytest_tests_total, 1))",
+          "legendFormat": "Pass Rate"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "textMode": "value" },
+      "title": "Total de Testes",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "pytest_tests_total",
+          "legendFormat": "Total"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "green" } } },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "textMode": "value" },
+      "title": "Testes Passando",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "pytest_tests_passed",
+          "legendFormat": "Passed"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "red" } } },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "textMode": "value" },
+      "title": "Testes Falhando",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "clamp_min(pytest_tests_total - pytest_tests_passed, 0)",
+          "legendFormat": "Failed"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Evolucao da Massa de Testes",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "pytest_tests_total", "legendFormat": "Total" },
+        { "expr": "pytest_tests_passed", "legendFormat": "Passed" },
+        { "expr": "clamp_min(pytest_tests_total - pytest_tests_passed, 0)", "legendFormat": "Failed" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Tendencia de Erros de Validacao",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(asis_validation_errors_total[$interval])) by (validation_type)",
+          "legendFormat": "{{ validation_type }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 7,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Erros" }] },
+      "title": "Top Erros de Validacao (Tipo/Campo)",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "sum(increase(asis_validation_errors_total[$interval])) by (validation_type, field)",
+          "legendFormat": "{{ validation_type }} / {{ field }}",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": {
+              "validation_type": "Tipo",
+              "field": "Campo",
+              "Value": "Erros"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 14 },
+      "id": 8,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "Risco por Falhas Atuais",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "clamp_min(pytest_tests_total - pytest_tests_passed, 0)",
+          "legendFormat": "Falhas"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 2 } },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 14 },
+      "id": 9,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "textMode": "value" },
+      "title": "Health Score de Testes",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "100 * (pytest_tests_passed / clamp_min(pytest_tests_total, 1))",
+          "legendFormat": "Score"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "id": 10,
+      "options": { "showHeader": true },
+      "title": "Backlog Prioritario por Dominio (placeholder operacional)",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "label_replace(vector(1), \"area\", \"DN1\", \"__name__\", \".*\") or label_replace(vector(1), \"area\", \"DN2\", \"__name__\", \".*\") or label_replace(vector(1), \"area\", \"DN3\", \"__name__\", \".*\") or label_replace(vector(1), \"area\", \"DN4\", \"__name__\", \".*\") or label_replace(vector(1), \"area\", \"RF1\", \"__name__\", \".*\") or label_replace(vector(1), \"area\", \"RNF1\", \"__name__\", \".*\") or label_replace(vector(1), \"area\", \"INT3\", \"__name__\", \".*\") or label_replace(vector(1), \"area\", \"INT5\", \"__name__\", \".*\")",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {
+              "area": "Area",
+              "Value": "Prioridade Base"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["asis", "testing", "quality", "risk"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "5m", "value": "5m" },
+        "label": "Intervalo",
+        "name": "interval",
+        "options": [
+          { "selected": false, "text": "1m", "value": "1m" },
+          { "selected": true, "text": "5m", "value": "5m" },
+          { "selected": false, "text": "15m", "value": "15m" }
+        ],
+        "query": "1m,5m,15m",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timezone": "browser",
+  "title": "ASIS TaxTech - Dashboard de Testes Restantes",
+  "uid": "asis-testing-gap-dashboard",
+  "version": 1,
+  "weekStart": ""
+}

@@ -26,6 +26,12 @@ Esta documentação está organizada em diferentes arquivos conforme apresentado
 
 - [**projeto.md**](./projeto.md): documento principal do produto, descrevendo os Business Drivers/Direcionadores de Negócio (BD/DN), a justificativa de priorização, decisões arquiteturais e os resultados das validações (Blue Team e Red Team) com evidências e métricas.
 
+### Dashboard e Observabilidade
+
+- [**execucao-dashboard.md**](./execucao-dashboard.md): guia unificado de execução da stack completa do projeto (API ASIS, Prometheus, Grafana, Alertmanager e frontend Next.js), incluindo pré-requisitos, variáveis de ambiente, troubleshooting e ordem de inicialização.
+- [**dashboard.md**](./dashboard.md): documentação técnica do Dashboard da Qualidade — arquitetura da stack de observabilidade, métricas Prometheus expostas, painéis Grafana, regras de alerta e Truth Definitions.
+- [**plano_integracao_prometheus.md**](./plano_integracao_prometheus.md): plano de integração Prometheus com tarefas, arquitetura, mapeamento de métricas e referências técnicas.
+- [**catalogo_servicos_monitorados.md**](./catalogo_servicos_monitorados.md): catálogo de serviços monitorados com mapeamento de endpoints para DN/RF/RNF, métricas e SLAs.
 
 ## 📋 Licença/License
 

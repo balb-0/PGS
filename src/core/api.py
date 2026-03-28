@@ -1,6 +1,19 @@
-from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path, Depends
+from fastapi import FastAPI, Header, HTTPException, Body, UploadFile, File, Response, Path, Depends, Request, Query
+from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Dict, Any, List, Optional
 import uuid
+import time
+import re
+
+from . import metrics as prom_metrics
+from .dashboard_services import (
+    DashboardDependencies,
+    DashboardFilters,
+    BusinessDashboardService,
+    SystemHealthDashboardService,
+    TestingGapDashboardService,
+    build_dashboard_metadata,
+)
 import asyncio
 import random
 import os
@@ -1121,7 +1134,103 @@ transaction_history = TransactionHistoryStore()
 # Instância global do analisador de sazonalidade (stateless, usa métodos estáticos)
 seasonality_analyzer = SeasonalityAnalyzer()
 
+dashboard_dependencies = DashboardDependencies(
+    health_checker=health_checker,
+    circuit_breaker=circuit_breaker,
+    rate_limiter=rate_limiter,
+    process_store=process_store,
+    audit_log=audit_log,
+    idempotency_store=idempotency_store,
+    transaction_history=transaction_history,
+)
+business_dashboard_service = BusinessDashboardService(dashboard_dependencies)
+system_health_dashboard_service = SystemHealthDashboardService(dashboard_dependencies)
+testing_gap_dashboard_service = TestingGapDashboardService(dashboard_dependencies)
+
 app = FastAPI(title="API_G6 - ASIS TaxTech (Unified Proxy & Mock Fallback)", version="2.0.0")
+
+
+def parse_dashboard_filters(
+    interval: str = Query(default="1h"),
+    step: str = Query(default="5m"),
+    endpoint: str = Query(default="all"),
+    source: str = Query(default="all"),
+    account: str = Query(default="all"),
+    dn: str = Query(default="all"),
+) -> DashboardFilters:
+    if not re.match(r"^\d+[mhd]$", interval):
+        raise HTTPException(status_code=400, detail="Filtro 'interval' inválido. Use formatos como 30m, 1h, 7d.")
+    if not re.match(r"^\d+[smhd]$", step):
+        raise HTTPException(status_code=400, detail="Filtro 'step' inválido. Use formatos como 30s, 1m, 5m.")
+    if source not in {"all", "real", "mock"}:
+        raise HTTPException(status_code=400, detail="Filtro 'source' inválido. Use all, real ou mock.")
+
+    return DashboardFilters(
+        interval=interval,
+        step=step,
+        endpoint=endpoint,
+        source=source,
+        account=account,
+        dn=dn,
+    )
+
+
+# =============================================================================
+# T3 — Middleware de Instrumentação Prometheus (endpoint, method, status, source)
+# =============================================================================
+
+def _normalize_path(path: str) -> str:
+    """Normaliza path para reduzir cardinalidade nas métricas Prometheus."""
+    parts = path.strip("/").split("/")
+    normalized = []
+    for p in parts:
+        if re.match(r"^\d+$", p):
+            normalized.append("{id}")
+        elif re.match(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", p, re.I
+        ):
+            normalized.append("{uuid}")
+        elif re.match(r"^[a-f0-9]{16,64}$", p, re.I):
+            normalized.append("{hash}")
+        else:
+            normalized.append(p)
+    return "/" + "/".join(normalized) if normalized else "/"
+
+
+def _status_label(status_code: int) -> str:
+    """Mapeia status HTTP para label de métrica."""
+    if 200 <= status_code < 300:
+        return "success"
+    if status_code == 400:
+        return "validation_error"
+    return "error"
+
+
+class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
+    """Middleware que registra requisições nas métricas Prometheus (DN1, T3)."""
+
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration = time.perf_counter() - start
+
+        endpoint = _normalize_path(request.url.path)
+        method = request.method
+        status = _status_label(response.status_code)
+        source = getattr(request.state, "source", "mock")
+
+        prom_metrics.record_request(
+            endpoint=endpoint,
+            method=method,
+            duration_seconds=duration,
+            status=status,
+            source=source,
+        )
+
+        return response
+
+
+app.add_middleware(PrometheusMetricsMiddleware)
 
 # =============================================================================
 # ASIS API PURE PROXIES (REAL ENDPOINTS FALLBACK)
@@ -1425,6 +1534,71 @@ async def health_check():
     status["availability_alert"] = check_availability_alert(health_checker)
     status["circuit_alert"] = check_circuit_alert(circuit_breaker)
     return status
+
+
+@app.get("/metrics", status_code=200)
+async def prometheus_metrics():
+    """
+    Endpoint de métricas Prometheus (DN1-DN4, Dashboard da Qualidade).
+
+    Expõe métricas de latência, requisições, validação, disponibilidade,
+    circuit breaker, rate limit, log de auditoria e stores.
+    """
+    health_status = health_checker.get_status()
+    cb_state = circuit_breaker.state.value
+    rate_remaining = rate_limiter.get_remaining_for_all_accounts()
+    proc_size = process_store.size()
+    audit_size = audit_log.size()
+    idem_size = idempotency_store.size()
+
+    prom_metrics.update_gauges_from_state(
+        health_status=health_status,
+        circuit_state=cb_state,
+        rate_limit_remaining_by_account=rate_remaining,
+        process_store_size=proc_size,
+        audit_log_size=audit_size,
+        idempotency_store_size=idem_size,
+    )
+
+    return Response(
+        content=prom_metrics.get_metrics_output(),
+        media_type=prom_metrics.get_content_type(),
+    )
+
+
+@app.get("/api/v1/dashboard/business", status_code=200)
+async def get_business_dashboard(
+    filters: DashboardFilters = Depends(parse_dashboard_filters),
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return business_dashboard_service.build(filters)
+
+
+@app.get("/api/v1/dashboard/system-health", status_code=200)
+async def get_system_health_dashboard(
+    filters: DashboardFilters = Depends(parse_dashboard_filters),
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return system_health_dashboard_service.build(filters)
+
+
+@app.get("/api/v1/dashboard/testing-gap", status_code=200)
+async def get_testing_gap_dashboard(
+    filters: DashboardFilters = Depends(parse_dashboard_filters),
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return testing_gap_dashboard_service.build(filters)
+
+
+@app.get("/api/v1/dashboard/metadata", status_code=200)
+async def get_dashboard_metadata(
+    auth: Dict[str, str] = Depends(authenticate_request),
+):
+    _ = auth
+    return build_dashboard_metadata()
 
 
 @app.post("/api/v1/auditar/resilient", status_code=201)

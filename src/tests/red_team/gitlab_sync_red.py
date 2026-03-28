@@ -24,7 +24,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-_repo_root = Path(__file__).resolve().parent.parent.parent
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent
 _env_path = _repo_root / ".env"
 if _env_path.exists():
     try:
@@ -36,7 +36,7 @@ if _env_path.exists():
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
-from scripts.verifica_versao_gitlab import (
+from src.scripts.verifica_versao_gitlab import (
     verificar_protocolo_gitlab,
     get_ultimo_commit,
     verificar_sincronismo,
@@ -60,7 +60,7 @@ class TestINT4R1PathTraversal:
         Injeta '../' no project path. A funcao deve retornar erro ou
         resultado vazio, sem expor dados de outros projetos.
         """
-        with patch("scripts.verifica_versao_gitlab.GITLAB_PROJECT_PATH", "../../admin/secret"):
+        with patch("src.scripts.verifica_versao_gitlab.GITLAB_PROJECT_PATH", "../../admin/secret"):
             try:
                 resultado = get_ultimo_commit("main")
                 assert resultado is None, (
@@ -77,7 +77,7 @@ class TestINT4R1PathTraversal:
             "graduacao/../../../etc/passwd",
         ]
         for path_mal in paths_maliciosos:
-            with patch("scripts.verifica_versao_gitlab.GITLAB_PROJECT_PATH", path_mal):
+            with patch("src.scripts.verifica_versao_gitlab.GITLAB_PROJECT_PATH", path_mal):
                 try:
                     resultado = get_ultimo_commit("main")
                     assert resultado is None, (
@@ -129,8 +129,8 @@ class TestINT4R3ResponseValidation:
         mock_resp.status_code = 200
         mock_resp.json.side_effect = ValueError("Invalid JSON")
 
-        with patch("scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+        with patch("src.scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             try:
                 resultado = get_ultimo_commit("main")
                 assert resultado is None
@@ -143,8 +143,8 @@ class TestINT4R3ResponseValidation:
         mock_resp.status_code = 200
         mock_resp.json.return_value = []
 
-        with patch("scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+        with patch("src.scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             try:
                 resultado = get_ultimo_commit("main")
                 assert resultado is None
@@ -157,8 +157,8 @@ class TestINT4R3ResponseValidation:
         mock_resp.status_code = 200
         mock_resp.json.return_value = [{"unexpected_field": "value"}]
 
-        with patch("scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+        with patch("src.scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             try:
                 resultado = get_ultimo_commit("main")
                 if resultado is not None:
@@ -172,8 +172,8 @@ class TestINT4R3ResponseValidation:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"error": "not found"}
 
-        with patch("scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+        with patch("src.scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             try:
                 resultado = get_ultimo_commit("main")
                 assert resultado is None
@@ -195,8 +195,8 @@ class TestINT4R3ResponseValidation:
                 return mock_commits
             return mock_project
 
-        with patch("scripts.verifica_versao_gitlab.requests.get", side_effect=mock_get), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+        with patch("src.scripts.verifica_versao_gitlab.requests.get", side_effect=mock_get), \
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             resultado = verificar_protocolo_gitlab()
             assert resultado["ok"] is False
 
@@ -242,8 +242,8 @@ class TestINT4R5RateLimitHandling:
         mock_resp.status_code = 429
         mock_resp.json.return_value = {"message": "429 Too Many Requests"}
 
-        with patch("scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+        with patch("src.scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             try:
                 resultado = get_ultimo_commit("main")
                 assert resultado is None
@@ -256,8 +256,8 @@ class TestINT4R5RateLimitHandling:
         mock_resp.status_code = 429
         mock_resp.json.return_value = {"message": "429 Too Many Requests"}
 
-        with patch("scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+        with patch("src.scripts.verifica_versao_gitlab.requests.get", return_value=mock_resp), \
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             resultado = verificar_protocolo_gitlab()
             assert resultado["ok"] is False
 
@@ -265,18 +265,18 @@ class TestINT4R5RateLimitHandling:
         """Timeout de conexao com GitLab deve ser tratado sem crash."""
         import requests as req
 
-        with patch("scripts.verifica_versao_gitlab.requests.get",
+        with patch("src.scripts.verifica_versao_gitlab.requests.get",
                    side_effect=req.Timeout("Connection timed out")), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             try:
                 resultado = get_ultimo_commit("main")
                 assert resultado is None
             except TypeError:
                 pass
 
-        with patch("scripts.verifica_versao_gitlab.requests.get",
+        with patch("src.scripts.verifica_versao_gitlab.requests.get",
                    side_effect=req.Timeout("Connection timed out")), \
-             patch("scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
+             patch("src.scripts.verifica_versao_gitlab.GITLAB_PRIVATE_TOKEN", "mock-token"):
             resultado = verificar_protocolo_gitlab()
             assert resultado["ok"] is False
 

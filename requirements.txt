@@ -12,3 +12,4 @@ python-multipart>=0.0.9
 PyJWT[crypto]>=2.8.0
 python-jose[cryptography]>=3.3.0
 cryptography>=41.0.0
+prometheus-client>=0.19.0

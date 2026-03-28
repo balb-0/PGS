@@ -41,40 +41,71 @@ Em um contexto **API First** na ASIS TaxTech, o desafio deste projeto é tratar 
 
 <a href="/docs/index.md">Link para a documentação geral</a> do projeto.
 
+## 📊 Dashboards Implementados
+
+O repositório adota **Grafana como camada principal de decisão** com 3 dashboards separados:
+
+- **Dashboard de Negócio**: `ASIS TaxTech - Dashboard de Negocio`
+- **Dashboard de Saúde do Sistema**: `ASIS TaxTech - Dashboard de Saude do Sistema`
+- **Dashboard de Testes Restantes**: `ASIS TaxTech - Dashboard de Testes Restantes`
+
+Esses dashboards são provisionados automaticamente via Docker em `grafana/dashboards/`.
+
+Novos endpoints backend para alimentar os dashboards:
+
+- `GET /api/v1/dashboard/business`
+- `GET /api/v1/dashboard/system-health`
+- `GET /api/v1/dashboard/testing-gap`
+- `GET /api/v1/dashboard/metadata`
+
 ## 📁 Estrutura de pastas
 
 ```
 g06/
 ├─ docs/
-│  ├─ index.md
-│  ├─ projeto.md
-│  ├─ gestao-projeto.md
-│  ├─ gestao-configuração.md
-│  └─ dev-rules.md
-├─ img/
+│  ├─ index.md                          # Índice da documentação
+│  ├─ projeto.md                        # Documento principal do produto
+│  ├─ gestao-projeto.md                 # Gestão de sprints e riscos
+│  ├─ gestao-configuração.md            # Políticas de repo e branches
+│  ├─ dev-rules.md                      # Padrões de código e testes
+│  ├─ execucao-dashboard.md              # Guia de execução do dashboard
+│  ├─ dashboard.md                      # Dashboard da Qualidade (Grafana/Prometheus)
+│  ├─ plano_integracao_prometheus.md    # Plano de integração Prometheus
+│  ├─ catalogo_servicos_monitorados.md  # Catálogo de endpoints monitorados
+│  └─ ESMD9_ASIS_TAP_2025.md           # TAP do projeto parceiro
 ├─ src/
 │  ├─ core/
-│  │  ├─ mock_api.py
-│  │  ├─ availability.py
-│  │  └─ non_repudiation.py
+│  │  ├─ api.py                         # API FastAPI principal
+│  │  ├─ metrics.py                     # Métricas Prometheus
+│  │  ├─ dashboard_services.py          # Serviços de dashboard
+│  │  ├─ auth_clerk.py                  # Autenticação Clerk
+│  │  └─ auth_hybrid.py                 # Autenticação híbrida
+│  ├─ scripts/
+│  │  ├─ pytest_metrics_exporter.py     # Exporter de métricas pytest
+│  │  ├─ collect_pytest_metrics.py      # Coletor de métricas
+│  │  └─ verifica_versao_gitlab.py      # Sincronismo GitLab
 │  └─ tests/
-│     ├─ blue_team/
-│     └─ red_team/
-├─ requirements.txt
-├─ Makefile
+│     ├─ blue_team/                     # Testes de qualidade (Blue Team)
+│     └─ red_team/                      # Testes adversariais (Red Team)
+├─ grafana/
+│  ├─ dashboards/                       # JSONs dos dashboards Grafana
+│  └─ provisioning/                     # Datasources e provisioning
+├─ dashboard/
+│  └─ frontend/                         # App Next.js (dashboards executivos)
+├─ docker-compose.yml                   # Stack Prometheus + Grafana + Alertmanager
+├─ requirements.txt                     # Dependências Python
+├─ pytest.ini                           # Configuração pytest
+├─ sonar-project.properties             # Configuração SonarCloud
 └─ README.md
 ```
 
+Dentre os principais diretórios:
 
-Dentre os arquivos presentes na raiz do projeto, definem-se:
-
-- <b>readme.md</b>: arquivo que serve como guia e explicação geral sobre o projeto (o mesmo que você está lendo agora).
-
-- <b>documentos</b>: aqui estarão todos os documentos do projeto. Há também uma pasta denominada <b>outros</b> onde podem estar presentes documentos complementares à documentação principal.
-
-- <b>imagens</b>: imagens relacionadas ao projeto como um todo (por exemplo imagens do sistema, do grupo, logotipos e afins).
-
-- <b>src</b>: nesta pasta encontra-se todo o código fonte do sistema (circuito e eventuais sistemas complementares).
+- **docs/**: documentação completa do projeto (produto, gestão, padrões, observabilidade).
+- **src/core/**: API FastAPI, métricas Prometheus e serviços de dashboard.
+- **src/tests/**: testes automatizados Blue Team (qualidade) e Red Team (adversariais).
+- **grafana/**: dashboards Grafana provisionados automaticamente via Docker.
+- **dashboard/frontend/**: aplicação Next.js com dashboards executivos e busca IA.
 
 ## 💻 Configuração para desenvolvimento
 
@@ -83,7 +114,8 @@ Para configurar o desenvolvimento da aplicação, [instale o git](https://git-sc
 ```
 git clone https://git.inteli.edu.br/graduacao/2026-1a/t13/g06
 ```
-Em seguida siga as instruções presentes em nosso <a href="/documentos/manual-instalacao.md">manual de instalação</a>.
+
+Em seguida siga as instruções presentes no <a href="docs/execucao-dashboard.md">guia de execução</a> para configurar o ambiente e subir a stack completa (API, Prometheus, Grafana e frontend).
 
 ## 🗃 Histórico de lançamentos
 
