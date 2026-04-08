@@ -6,9 +6,10 @@ import { AISearchResponse } from "@/types/graph";
 
 type Props = {
   onResult: (result: AISearchResponse | null) => void;
+  inputId?: string;
 };
 
-export function SearchBar({ onResult }: Props) {
+export function SearchBar({ onResult, inputId }: Props) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +78,7 @@ export function SearchBar({ onResult }: Props) {
 
       <form className="search-input-wrap" onSubmit={runSearch}>
         <input
+          id={inputId}
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
