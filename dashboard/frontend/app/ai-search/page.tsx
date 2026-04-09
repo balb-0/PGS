@@ -48,7 +48,7 @@ export default function AISearchPage() {
         </p>
       </article>
 
-      <SearchBar onResult={handleSearchResult} />
+      <SearchBar onResult={handleSearchResult} inputId="global-filter-primary" />
 
       {!searchResult ? (
         <div className="empty-state">Digite uma consulta para começar. Exemplo: "quero investigar erros por serviço".</div>
@@ -73,7 +73,9 @@ export default function AISearchPage() {
             panelId={graph.panelId}
             title={graph.title}
             narrative={graph.reason}
-            timeRange="now-24h"
+            from="now-24h"
+            to="now"
+            refresh="off"
           />
         ))}
       </section>
