@@ -239,6 +239,10 @@ class ProcessStore:
             if erro_detalhes is not None:
                 proc["erro_detalhes"] = erro_detalhes
 
+    def size(self) -> int:
+        with self._lock:
+            return len(self._processes)
+
 
 process_store = ProcessStore()
 
@@ -277,6 +281,19 @@ class RateLimiter:
             cutoff = now - self._window
             active = [t for t in timestamps if t > cutoff]
             return max(0, self._max_requests - len(active))
+
+    def get_remaining_for_all_accounts(self) -> Dict[str, int]:
+        now = time.time()
+        with self._lock:
+            cutoff = now - self._window
+            remaining_by_account: Dict[str, int] = {}
+
+            for account_key, timestamps in self._requests.items():
+                active = [t for t in timestamps if t > cutoff]
+                account_key_hash = hashlib.sha256(account_key.encode("utf-8")).hexdigest()[:16]
+                remaining_by_account[account_key_hash] = max(0, self._max_requests - len(active))
+
+            return remaining_by_account
 
     def reset(self, account_key: Optional[str] = None):
         with self._lock:

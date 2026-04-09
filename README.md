@@ -40,6 +40,8 @@ Em um contexto **API First** na ASIS TaxTech, o desafio deste projeto é tratar 
 ## 📝 LINKS
 
 <a href="/docs/index.md">Link para a documentação geral</a> do projeto.
+<br>
+<a href="/docs/projeto.pdf">Versão em PDF do documento do projeto</a>.
 
 ## 📊 Dashboards Implementados
 
@@ -68,7 +70,6 @@ g06/
 │  ├─ gestao-projeto.md                 # Gestão de sprints e riscos
 │  ├─ gestao-configuração.md            # Políticas de repo e branches
 │  ├─ dev-rules.md                      # Padrões de código e testes
-│  ├─ execucao-dashboard.md              # Guia de execução do dashboard
 │  ├─ dashboard.md                      # Dashboard da Qualidade (Grafana/Prometheus)
 │  ├─ plano_integracao_prometheus.md    # Plano de integração Prometheus
 │  ├─ catalogo_servicos_monitorados.md  # Catálogo de endpoints monitorados
@@ -106,6 +107,21 @@ Dentre os principais diretórios:
 - **src/tests/**: testes automatizados Blue Team (qualidade) e Red Team (adversariais).
 - **grafana/**: dashboards Grafana provisionados automaticamente via Docker.
 - **dashboard/frontend/**: aplicação Next.js com dashboards executivos e busca IA.
+- **dashboard/execucao-dashboard.md**: guia unificado para subir API, Prometheus, Grafana e frontend.
+
+## ✅ Requisitos
+
+Para executar o projeto localmente, utilize as versões abaixo (ou superiores compatíveis):
+
+- **Git**: 2.40+
+- **Python**: 3.12+ (alinhado ao pipeline CI)
+- **pip**: 23+
+- **Node.js**: 20+
+- **npm**: 10+
+- **Docker Engine**: 24+
+- **Docker Compose plugin**: 2.20+
+
+Dependências Python do projeto estão em `requirements.txt` (FastAPI, pytest, pytest-cov, pytest-html, Locust, Prometheus client, JWT).
 
 ## 💻 Configuração para desenvolvimento
 
@@ -115,7 +131,27 @@ Para configurar o desenvolvimento da aplicação, [instale o git](https://git-sc
 git clone https://git.inteli.edu.br/graduacao/2026-1a/t13/g06
 ```
 
-Em seguida siga as instruções presentes no <a href="docs/execucao-dashboard.md">guia de execução</a> para configurar o ambiente e subir a stack completa (API, Prometheus, Grafana e frontend).
+Entre na pasta do projeto e instale as dependências com versionamento de ambiente:
+
+```bash
+cd g06
+python -m venv .venv
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
+# Linux/macOS
+# source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Para o frontend de dashboards:
+
+```bash
+cd dashboard/frontend
+npm install
+```
+
+Em seguida siga as instruções presentes no <a href="dashboard/execucao-dashboard.md">guia de execução</a> para configurar o ambiente e subir a stack completa (API, Prometheus, Grafana e frontend).
 
 ## 🗃 Histórico de lançamentos
 

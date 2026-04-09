@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import xml.etree.ElementTree as ET
+import math
 
 from .prometheus_client import PrometheusClient
 
@@ -62,9 +63,14 @@ def _read_float(result_data: List[Dict[str, Any]], default: float = 0.0) -> floa
     if not value or len(value) < 2:
         return default
     try:
-        return float(value[1])
+        parsed = float(value[1])
     except (TypeError, ValueError):
         return default
+
+    if not math.isfinite(parsed):
+        return default
+
+    return parsed
 
 
 def _read_series(result_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -79,6 +85,8 @@ def _read_series(result_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             try:
                 numeric = float(raw_value)
             except (TypeError, ValueError):
+                continue
+            if not math.isfinite(numeric):
                 continue
             points.append({"t": ts, "v": numeric})
         series.append({"metric": metric, "points": points})

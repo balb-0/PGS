@@ -156,6 +156,9 @@
 - [6. Dashboard e Observabilidade](#6-dashboard-e-observabilidade)
   - [6.1 Prometheus](#61-prometheus)
   - [6.2 Grafana e Dashboards Executivos](#62-grafana-e-dashboards-executivos)
+- [7. Consolidação Final da API e do Controle de Qualidade](#7-consolidação-final-da-api-e-do-controle-de-qualidade)
+  - [7.1 Ajustes finais de implementação da API](#71-ajustes-finais-de-implementação-da-api)
+  - [7.2 Análise do repositório: programas de controle de qualidade](#72-análise-do-repositório-programas-de-controle-de-qualidade)
 
 ## Contextualização de BD/DN, análises de qualidade e decisões arquiteturais
 
@@ -3173,3 +3176,68 @@ Para detalhes técnicos sobre a stack de observabilidade, painéis PromQL, Truth
 - **[execucao-dashboard.md](./execucao-dashboard.md)**: guia unificado de execução da stack completa (API, Docker, Grafana, frontend)
 - **[plano_integracao_prometheus.md](./plano_integracao_prometheus.md)**: plano técnico de integração Prometheus
 - **[catalogo_servicos_monitorados.md](./catalogo_servicos_monitorados.md)**: catálogo de endpoints e mapeamento para DN/RF/RNF
+
+---
+
+# 7. Consolidação Final da API e do Controle de Qualidade
+
+## 7.1 Ajustes finais de implementação da API
+
+Nesta etapa final, a API foi consolidada com foco em robustez funcional, segurança de acesso, rastreabilidade e operação observável.
+
+### Ajustes aplicados na camada de domínio da API
+
+- **Validação semântica de destino fiscal (RF2):** o campo `destino` passou a ser validado contra `MODULOS_FISCAIS_VALIDOS`, com normalização case-insensitive e erro HTTP 400 para módulos não suportados.
+- **Autenticidade de credenciais (RNF2):** a autenticação por `account-key` e `app-key` foi reforçada com registro explícito de pares válidos (`VALID_CREDENTIAL_PAIRS`), com retorno 401 para ausência de credenciais e 403 para credenciais inválidas.
+- **Consulta de status assíncrono (RF1):** a API mantém estado de processamento em `ProcessStore` e expõe consulta via `GET /api/v1/processo/{tracking_id}` para rastreamento do ciclo do lote.
+
+### Ajustes aplicados na camada de resiliência (DN3)
+
+- **Rate limiting por conta** com janela deslizante (`RateLimiter`) e visibilidade de saldo remanescente por chave hasheada.
+- **Circuit breaker com estados `CLOSED` / `OPEN` / `HALF_OPEN`** (`CircuitBreaker`) para evitar falhas em cascata.
+- **Health check operacional** com métricas de erro, uptime e volume processado (`HealthChecker`).
+- **Idempotência** com store dedicado (`IdempotencyStore`) para evitar reprocessamento acidental de requisições.
+- **Degradação graciosa e alertas de disponibilidade**, com resposta de fallback e sinalização explícita quando o serviço opera sob pressão.
+
+### Ajustes aplicados na camada de não-repúdio (DN4)
+
+- **Assinatura HMAC-SHA256** por transação, vinculando payload e timestamp.
+- **Recibo digital completo** com `signature`, `timestamp`, `actor`, `tracking_id` e `payload_hash`.
+- **Log de auditoria encadeado (hash chain)** por meio de `AuditLog`, com verificação de integridade ponta a ponta.
+- **Endpoint de disputa de não-repúdio** (`POST /api/v1/disputa/nr`) integrado ao histórico transacional para análise de sazonalidade.
+
+### Ajustes aplicados na camada de identidade (INT3)
+
+- **Autenticação híbrida consolidada:** convivência de API Keys legadas com Clerk JWT no endpoint `POST /api/v1/auditar/clerk`.
+- **Validação JWT com JWKS e cache com TTL**, reduzindo latência e dependência de chamadas externas a cada requisição.
+- **Pseudonimização de identidade** (hash de ator) para manter rastreabilidade com aderência à LGPD.
+
+### Ajustes aplicados na camada de observabilidade
+
+- **Instrumentação Prometheus no núcleo da API** (`src/core/metrics.py`) com métricas de latência, integridade, disponibilidade, não-repúdio e capacidade.
+- **Endpoint `GET /metrics`** consolidado para integração com Prometheus e dashboards de operação/qualidade.
+- **Serviços de dashboard backend** (`/api/v1/dashboard/business`, `/system-health`, `/testing-gap`, `/metadata`) estabilizados para consumo do Grafana e do frontend Next.js.
+
+## 7.2 Análise do repositório: programas de controle de qualidade
+
+O repositório ficou estruturado com um conjunto de programas de controle de qualidade em múltiplas camadas (teste, análise estática, carga, observabilidade e governança de versão).
+
+### Visão consolidada dos programas
+
+| Programa | Objetivo | Implementação no repositório | Evidência/execução |
+|---|---|---|---|
+| **Testes funcionais e não funcionais (Blue Team)** | Validar contrato, regras de negócio e critérios de aceite por DN/RF/RNF | `src/tests/blue_team/*.py` | `pytest src/tests/blue_team -v` |
+| **Testes adversariais (Red Team)** | Exercitar abuso, bypass e limites operacionais | `src/tests/red_team/*.py` | `pytest src/tests/red_team -v` |
+| **Análise estática e quality gate (INT1)** | Medir qualidade de código e bloquear regressão estrutural | `.gitlab-ci.yml` + `sonar-project.properties` + SonarCloud | stage `quality` com `sonar-scanner` |
+| **Cobertura e relatório de testes** | Garantir testabilidade e rastreabilidade de execução | `pytest-cov`, `pytest-html`, `coverage.xml`, `pytest-report.xml` | `pytest --cov=src/core --cov-report=xml:coverage.xml --junitxml=pytest-report.xml` |
+| **Carga e estresse (INT2 / Locust)** | Medir comportamento sob concorrência real e validar SLA | `src/locust_tests.py` + documentação de execução | `locust ... --host http://127.0.0.1:8000` |
+| **Métricas de massa de testes** | Expor qualidade da suíte para monitoramento contínuo | `src/scripts/collect_pytest_metrics.py` e `src/scripts/pytest_metrics_exporter.py` | exporter em `:9092/metrics` |
+| **Observabilidade operacional** | Correlacionar saúde da API com DNs e alertas | `prometheus.docker.standalone.yml`, `rules.yml`, `docker-compose.yml`, dashboards Grafana | stack Prometheus + Grafana + Alertmanager |
+| **Governança de versão (INT4)** | Verificar sincronismo entre homologação e produção | `src/scripts/verifica_versao_gitlab.py` + testes Blue/Red | comparação `main` x `develop` via GitLab API v4 |
+
+### Síntese do estado final dos controles de qualidade
+
+- O repositório adotou **controle de qualidade orientado a evidência**, com rastreio explícito entre requisitos (DN/RF/RNF), código e testes.
+- A qualidade foi tratada como **processo contínuo**, combinando validação pré-merge (CI), monitoramento em runtime (Prometheus/Grafana) e testes adversariais.
+- A cobertura inclui tanto **conformidade funcional** quanto **resiliência operacional e segurança**, reduzindo risco de regressões silenciosas.
+- A arquitetura documental e técnica está pronta para evolução incremental, com trilha clara para endurecimento adicional de produção (políticas de retenção, limites de store em memória, e expansão de controles de autenticação/anti-replay).

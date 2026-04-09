@@ -100,6 +100,41 @@ O `DashboardShell` padroniza:
 - enquadramento visual da leitura executiva;
 - troca de tema claro/escuro.
 
+### Acessibilidade: alto contraste e navegacao por teclado
+
+As rotas do frontend passaram a incluir recursos de acessibilidade voltados a legibilidade e produtividade operacional.
+
+#### Alto contraste
+
+- A barra superior possui o botao `Alto contraste`, que alterna entre `default` e `high`.
+- O estado e persistido em `localStorage` com a chave `asis-contrast`.
+- O modo aplica o atributo `data-contrast` no elemento raiz e reforca elementos criticos de leitura:
+  - aumento de contraste de superficie e bordas;
+  - destaque forte de foco via `--focus-ring`;
+  - aumento de espessura de bordas em botoes e links de acao.
+- A mudanca visual usa transicao curta (`contrast-animating`) para reduzir efeito de flash abrupto.
+
+#### Navegacao por teclado
+
+- Existe `skip-link` no topo para pular direto ao conteudo principal (`#dashboard-main-content`).
+- O frontend exibe foco visivel consistente em links, botoes, campos de busca/filtro e acoes dos cards Grafana.
+- Atalhos globais padrao:
+  - `Alt+1`: abrir dashboard de Negocio;
+  - `Alt+2`: abrir dashboard de Saude;
+  - `Alt+3`: abrir Busca IA;
+  - `Alt+F`: focar filtro principal (`global-filter-primary`);
+  - `Alt+E`: abrir/exportar relatorio (aciona `report-builder-trigger`).
+- Os atalhos podem ser personalizados pelo botao `Atalhos` e sao persistidos em `localStorage` (`asis-shortcuts`).
+- Para evitar conflito de uso, atalhos de digitacao simples nao interceptam teclado quando o foco esta em `input`, `textarea`, `select` ou campo editavel.
+
+#### Comportamento de foco em modais
+
+- O modal de configuracao de atalhos pode ser fechado por `Escape`.
+- O modal expandido de grafico (`GrafanaEmbedCard`) suporta:
+  - fechamento por `Escape`;
+  - ciclo de foco com `Tab` e `Shift+Tab` (focus trap);
+  - retorno de foco ao elemento anterior ao fechar.
+
 Essa estrutura reforca uma ideia importante: o frontend e uma console de decisao, nao apenas uma colecao de iframes do Grafana.
 
 ## Dashboard de Negocio
@@ -839,6 +874,41 @@ O `DashboardShell` padroniza:
 - título e subtítulo de contexto;
 - enquadramento visual da leitura executiva;
 - troca de tema claro/escuro.
+
+### Acessibilidade: alto contraste e navegação por teclado
+
+As rotas do frontend passaram a incluir recursos de acessibilidade voltados à legibilidade e produtividade operacional.
+
+#### Alto contraste
+
+- A barra superior possui o botão `Alto contraste`, que alterna entre `default` e `high`.
+- O estado é persistido em `localStorage` com a chave `asis-contrast`.
+- O modo aplica o atributo `data-contrast` no elemento raiz e reforça elementos críticos de leitura:
+  - aumento de contraste de superfície e bordas;
+  - destaque forte de foco via `--focus-ring`;
+  - aumento de espessura de bordas em botões e links de ação.
+- A mudança visual usa transição curta (`contrast-animating`) para reduzir efeito de flash abrupto.
+
+#### Navegação por teclado
+
+- Existe `skip-link` no topo para pular direto ao conteúdo principal (`#dashboard-main-content`).
+- O frontend exibe foco visível consistente em links, botões, campos de busca/filtro e ações dos cards Grafana.
+- Atalhos globais padrão:
+  - `Alt+1`: abrir dashboard de Negócio;
+  - `Alt+2`: abrir dashboard de Saúde;
+  - `Alt+3`: abrir Busca IA;
+  - `Alt+F`: focar filtro principal (`global-filter-primary`);
+  - `Alt+E`: abrir/exportar relatório (aciona `report-builder-trigger`).
+- Os atalhos podem ser personalizados pelo botão `Atalhos` e são persistidos em `localStorage` (`asis-shortcuts`).
+- Para evitar conflito de uso, atalhos de digitação simples não interceptam teclado quando o foco está em `input`, `textarea`, `select` ou campo editável.
+
+#### Comportamento de foco em modais
+
+- O modal de configuração de atalhos pode ser fechado por `Escape`.
+- O modal expandido de gráfico (`GrafanaEmbedCard`) suporta:
+  - fechamento por `Escape`;
+  - ciclo de foco com `Tab` e `Shift+Tab` (focus trap);
+  - retorno de foco ao elemento anterior ao fechar.
 
 Essa estrutura reforça uma ideia importante: o frontend é uma console de decisão, não apenas uma coleção de iframes do Grafana.
 
